@@ -143,7 +143,7 @@
     // --- СЕТЕВОЙ КОД И МУЛЬТИПЛЕЕР ---
     const socket = typeof io !== 'undefined' ? io() : null;
     let isMultiplayer = false;
-    let networkEvents = []; // Очередь важных событий для отправки (генераторы, паллеты, взрывы)
+    let networkEvents = []; // Очередь важных событий для отправки (генераторы, паллеты, взрывы, хиты)
 
     if (socket) {
         socket.on('matchStarted', (data) => {
@@ -154,23 +154,56 @@
 
         socket.on('enemyPosition', (data) => {
             if (gameState !== 'PLAYING') return;
+            
             // Синхронизация движения
             if (myRole === 'SURVIVOR') {
                 killer.x = data.x; killer.y = data.y; killer.faceAngle = data.angle; killer.state = data.state;
             } else {
                 player.x = data.x; player.y = data.y;
+                if (data.hp !== undefined) player.hp = data.hp; // Синхронизируем ХП для худа маньяка
             }
-            // Синхронизация важных событий на карте (генераторы, паллеты)
+
+            // Синхронизация важных событий
             if (data.events && data.events.length > 0) {
                 for (let e of data.events) {
                     if (e.type === 'palletDrop' && pallets[e.id]) pallets[e.id].state = 'dropped';
                     if (e.type === 'palletBreak' && pallets[e.id]) pallets[e.id].state = 'broken';
-                    if (e.type === 'genUpdate' && generators[e.id]) generators[e.id].progress = e.progress;
-                    if (e.type === 'exitUpdate') exitGate.progress = e.progress;
+                    
+                    if (e.type === 'genUpdate' && generators[e.id]) {
+                        generators[e.id].progress = e.progress;
+                        if (e.progress >= 100) generators[e.id].done = true;
+                    }
+                    if (e.type === 'exitUpdate') {
+                        exitGate.progress = e.progress;
+                        if (e.progress >= 100) exitGate.isOpen = true;
+                    }
+                    if (e.type === 'chestUpdate' && chests[e.id]) chests[e.id].progress = e.progress;
+                    if (e.type === 'chestOpen' && chests[e.id]) chests[e.id].isOpen = true;
+                    
                     if (e.type === 'boom') {
-                        // Уведомление для маньяка о взрыве генератора
                         fakeExplosions.push({ x: e.x, y: e.y, timer: 180 });
                         playTone(150, 0.4, 'sawtooth');
+                    }
+                    
+                    // Логика ранений и побегов
+                    if (myRole === 'SURVIVOR' && e.type === 'hit') {
+                        if (player.invTimer === 0 && player.hp > 0) {
+                            player.hp -= 1; 
+                            player.invTimer = 90; 
+                            pState.hitSprintTimer = 120; 
+                            playTone(150, 0.5, 'sawtooth');
+                            
+                            if (player.hp <= 0) {
+                                socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, events: [{type: 'dead'}] });
+                                returnToLobby('ПРИНЕСЕН В ЖЕРТВУ', '#ff3333');
+                            }
+                        }
+                    }
+                    if (myRole === 'KILLER' && e.type === 'dead') {
+                        returnToLobby('ЖЕРТВА ПРИНЕСЕНА', '#4ade80');
+                    }
+                    if (myRole === 'KILLER' && e.type === 'escaped') {
+                        returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444');
                     }
                 }
             }
@@ -359,7 +392,6 @@
       else { 
           if (player.repairTarget) {
               player.repairTarget.progress = Math.max(0, player.repairTarget.progress - 12); 
-              // Событие взрыва генератора для сети
               networkEvents.push({ type: 'boom', x: player.repairTarget.x, y: player.repairTarget.y });
           }
           playTone(150, 0.4, 'sawtooth'); 
@@ -375,7 +407,7 @@
       pState = { hitSprintTimer: 0 };
       if (myRole === 'KILLER') hudGens.style.display = 'none'; else hudGens.style.display = 'block';
 
-      player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false;
+      player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0;
       
       generators = [ {x: 260, y: 550}, {x: 950, y: 350}, {x: 600, y: 950}, {x: 1450, y: 850} ].map(g => ({x: g.x, y: g.y, progress: 0, done: false}));
       pallets = allPalletSpawns.map(p => ({...p, state: 'up'}));
@@ -410,7 +442,7 @@
           for (let p of pallets) {
             if (p.state === 'up' && Math.hypot(player.x - p.cx, player.y - p.cy) < 70) {
                 p.state = 'dropped'; 
-                networkEvents.push({ type: 'palletDrop', id: pallets.indexOf(p) }); // Сетевое событие паллеты
+                networkEvents.push({ type: 'palletDrop', id: pallets.indexOf(p) }); 
                 playTone(200, 0.2, 'square'); 
                 if (Math.hypot(killer.x - p.cx, killer.y - p.cy) < 95 && killer.state !== 'STUNNED') { 
                     killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth'); 
@@ -535,26 +567,46 @@
               }
               if (player.invTimer > 0) player.invTimer--;
 
-              // Прогресс починки генератора / ворот
+              // Прогресс объектов
               if (player.isRepairing && player.repairTarget) {
                   if (player.repairTarget === exitGate) {
                       exitGate.progress += 0.25; 
                       networkEvents.push({ type: 'exitUpdate', progress: exitGate.progress });
                       if (exitGate.progress >= 100) { exitGate.isOpen = true; player.isRepairing = false; }
-                  } else {
+                  } 
+                  else if (chests.includes(player.repairTarget)) {
+                      player.repairTarget.progress += 0.5;
+                      networkEvents.push({ type: 'chestUpdate', id: chests.indexOf(player.repairTarget), progress: player.repairTarget.progress });
+                      if (player.repairTarget.progress >= 100) {
+                          player.repairTarget.isOpen = true;
+                          player.isRepairing = false;
+                          networkEvents.push({ type: 'chestOpen', id: chests.indexOf(player.repairTarget) });
+                          let lootList = ['flashlight', 'toolbox', 'medkit'];
+                          player.item = lootList[Math.floor(Math.random() * lootList.length)]; 
+                          player.charge = 100;
+                          playTone(600, 0.2, 'sine');
+                          player.repairTarget = null;
+                      }
+                  }
+                  else {
                       player.repairTarget.progress += 0.16;
                       networkEvents.push({ type: 'genUpdate', id: generators.indexOf(player.repairTarget), progress: player.repairTarget.progress });
-                      if (player.repairTarget.progress >= 100) { player.repairTarget.done = true; player.isRepairing = false; playTone(880, 0.3, 'sine'); } 
+                      if (player.repairTarget.progress >= 100) { 
+                          player.repairTarget.done = true; player.isRepairing = false; playTone(880, 0.3, 'sine'); 
+                          player.repairTarget = null;
+                      } 
                       else if (!skillCheck.active && Math.random() < 0.009) triggerSkillCheck();
                   }
               }
-              if (exitGate.isOpen && player.x > exitGate.x + 25) { returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#4ade80'); }
+              if (exitGate.isOpen && player.x > exitGate.x + 25) { 
+                  if (socket && isMultiplayer) socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, events: [{type: 'escaped'}] });
+                  returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#4ade80'); 
+              }
           }
           
-          // Отправка данных на сервер вынесена из блока "else", чтобы координаты отсылались и во время прыжка
           if (socket && isMultiplayer) {
-              socket.emit('updatePosition', { x: player.x, y: player.y, state: 'run', events: networkEvents });
-              networkEvents = []; // Очистка после отправки
+              socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, state: 'run', events: networkEvents });
+              networkEvents = [];
           }
       } 
       // --- ЛОГИКА МАНЬЯКА ---
@@ -566,7 +618,7 @@
               killer.timer--; if (killer.timer <= 0) { 
                   if(killer.targetPallet) {
                       killer.targetPallet.state = 'broken'; 
-                      networkEvents.push({ type: 'palletBreak', id: pallets.indexOf(killer.targetPallet) }); // Уведомляем сурва о сломе
+                      networkEvents.push({ type: 'palletBreak', id: pallets.indexOf(killer.targetPallet) });
                       playTone(150, 0.3, 'square'); 
                       killer.state = 'SEARCH';
                   }
@@ -589,13 +641,17 @@
               let angleDiff = Math.abs(angleToPlayer - killer.faceAngle);
               if (angleDiff > Math.PI) angleDiff = 2*Math.PI - angleDiff;
 
-              if (dist < (player.radius + killer.radius + 35) && angleDiff < Math.PI/3 && player.invTimer === 0) {
+              if (dist < (player.radius + killer.radius + 35) && angleDiff < Math.PI/3) {
                   playTone(110, 0.35, 'sawtooth'); 
                   killer.state = 'ATTACK_CD'; killer.timer = 80;
                   
-                  if (!isMultiplayer) {
-                      player.hp -= 1; pState.hitSprintTimer = 120; player.invTimer = 90;
-                      if (player.hp <= 0) returnToLobby('ЖЕРТВА ПРИНЕСЕНА', '#4ade80');
+                  if (!isMultiplayer) { // Локальный тест
+                      if (player.invTimer === 0 && player.hp > 0) {
+                          player.hp -= 1; pState.hitSprintTimer = 120; player.invTimer = 90;
+                          if (player.hp <= 0) returnToLobby('ЖЕРТВА ПРИНЕСЕНА', '#4ade80');
+                      }
+                  } else {
+                      networkEvents.push({ type: 'hit' }); // Оправляем пакет урона выжившему
                   }
               }
               if (killer.timer <= 0 && killer.state === 'ATTACK_LUNGE') { killer.state = 'ATTACK_CD'; killer.timer = 45; }
@@ -631,6 +687,13 @@
       const rem = generators.filter(g => !g.done).length; gensLeftLabel.innerText = rem > 0 ? rem : 'ВОРОТА!';
       playerHpLabel.innerText = player.hp === 2 ? 'ЗДОРОВ' : (player.hp === 1 ? 'РАНЕН' : 'МЕРТВ');
       playerHpLabel.style.color = player.hp === 2 ? '#4ade80' : '#ff4444';
+      
+      let itmName = 'НЕТ';
+      if (player.item === 'flashlight') itmName = 'ФОНАРИК';
+      else if (player.item === 'toolbox') itmName = 'ИНСТРУМЕНТЫ';
+      else if (player.item === 'medkit') itmName = 'АПТЕЧКА';
+      if (player.item) itmName += ` (${Math.floor(player.charge)}%)`;
+      hudItemLabel.innerText = itmName;
     }
     
     function render() {
@@ -668,6 +731,7 @@
       // Сундуки
       for (let c of chests) {
         ctx.fillStyle = c.isOpen ? "#78350f" : "#d97706"; ctx.fillRect(c.x-15, c.y-15, 30, 30); ctx.strokeStyle = "#fff"; ctx.strokeRect(c.x-15, c.y-15, 30, 30);
+        if (!c.isOpen && c.progress > 0) { ctx.fillStyle = "#fff"; ctx.fillRect(c.x-20, c.y-25, (c.progress/100)*40, 6); }
       }
       
       // Генераторы
@@ -676,7 +740,7 @@
         if (!g.done && g.progress > 0) { ctx.fillStyle = "#3b82f6"; ctx.fillRect(g.x-30, g.y-35, (g.progress/100)*60, 8); }
       });
       
-      // Взрывы генераторов (Уведомление для маньяка)
+      // Взрывы генераторов (Индикатор на карте)
       for (let f of fakeExplosions) {
           ctx.beginPath();
           ctx.arc(f.x, f.y, 70 + Math.sin(Date.now() / 100) * 15, 0, Math.PI*2);
@@ -684,6 +748,23 @@
           ctx.strokeStyle = "#ff0000"; ctx.lineWidth = 4; ctx.stroke();
           ctx.fillStyle = "#fff"; ctx.font = "bold 50px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
           ctx.fillText("!", f.x, f.y);
+
+          // Отрисовка стрелки-указателя, если взрыв за экраном
+          let sx = f.x - camera.x;
+          let sy = f.y - camera.y;
+          if (sx < 0 || sx > canvas.width || sy < 0 || sy > canvas.height) {
+              let ang = Math.atan2(sy - cy, sx - cx);
+              let distToEdge = Math.min(cx, cy) - 50;
+              let arrowX = camera.x + cx + Math.cos(ang) * distToEdge;
+              let arrowY = camera.y + cy + Math.sin(ang) * distToEdge;
+              
+              ctx.save();
+              ctx.translate(arrowX, arrowY);
+              ctx.rotate(ang);
+              ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-20, 15); ctx.lineTo(-20, -15); ctx.closePath();
+              ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+              ctx.restore();
+          }
       }
 
       // Сурв
