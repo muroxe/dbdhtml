@@ -143,6 +143,7 @@
     // --- СЕТЕВОЙ КОД И МУЛЬТИПЛЕЕР ---
     const socket = typeof io !== 'undefined' ? io() : null;
     let isMultiplayer = false;
+    let networkEvents = []; // Очередь важных событий для отправки (генераторы, паллеты, взрывы)
 
     if (socket) {
         socket.on('matchStarted', (data) => {
@@ -153,10 +154,25 @@
 
         socket.on('enemyPosition', (data) => {
             if (gameState !== 'PLAYING') return;
+            // Синхронизация движения
             if (myRole === 'SURVIVOR') {
                 killer.x = data.x; killer.y = data.y; killer.faceAngle = data.angle; killer.state = data.state;
             } else {
                 player.x = data.x; player.y = data.y;
+            }
+            // Синхронизация важных событий на карте (генераторы, паллеты)
+            if (data.events && data.events.length > 0) {
+                for (let e of data.events) {
+                    if (e.type === 'palletDrop' && pallets[e.id]) pallets[e.id].state = 'dropped';
+                    if (e.type === 'palletBreak' && pallets[e.id]) pallets[e.id].state = 'broken';
+                    if (e.type === 'genUpdate' && generators[e.id]) generators[e.id].progress = e.progress;
+                    if (e.type === 'exitUpdate') exitGate.progress = e.progress;
+                    if (e.type === 'boom') {
+                        // Уведомление для маньяка о взрыве генератора
+                        fakeExplosions.push({ x: e.x, y: e.y, timer: 180 });
+                        playTone(150, 0.4, 'sawtooth');
+                    }
+                }
             }
         });
 
@@ -174,7 +190,7 @@
 
     function forceStartMatch() {
         document.getElementById('matchmaking-screen').style.display = 'none';
-        isMultiplayer = false; // Возвращаем бота-маньяка для соло-тестов
+        isMultiplayer = false; 
         startMatch();
     }
     // ----------------------------------
@@ -266,7 +282,6 @@
       else if (aspectMode === '16:10') { canvas.width = 1280; canvas.height = 800; }
     } window.addEventListener('resize', resize); resize();
 
-    // Персонажи и перки
     const survivorsData = [
       { id: 's_hack', name: 'Хакер', color: '#22c55e', desc: 'Починка быстрее на 15%' },
       { id: 's_acro', name: 'Акробатка', color: '#ec4899', desc: 'Прыжки быстрее на 30%' },
@@ -316,7 +331,6 @@
     const player = { x: 0, y: 0, radius: 18, speed: 4.0, hp: 2, isRepairing: false, repairTarget: null, invTimer: 0, angle: Math.PI/2, item: null, charge: 0, healProgress: 0, vaulting: false, vaultProgress: 0, vaultStartX: 0, vaultStartY: 0, vaultEndX: 0, vaultEndY: 0, moving: false };
     const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', prevState: 'SEARCH', timer: 0, dashTimer: 0, lastX: 0, lastY: 0, angle: 0, vx: 0, vy: 0, faceAngle: Math.PI };
     
-    // ВОССТАНОВЛЕНА КАРТА С ПАЛЛЕТАМИ И ОКНАМИ
     const obstacles = [{ x: 400, y: 300, w: 120, h: 80 }, { x: 400, y: 460, w: 120, h: 60 }, { x: 800, y: 200, w: 250, h: 100 }, { x: 1200, y: 450, w: 100, h: 120 }, { x: 1200, y: 650, w: 100, h: 100 }, { x: 300, y: 800, w: 300, h: 90 }, { x: 850, y: 750, w: 180, h: 180 }, { x: 600, y: 1100, w: 100, h: 80 }, { x: 780, y: 1100, w: 170, h: 80 }];
     const windows = [ { x: 400, y: 380, w: 120, h: 80, vaultDir: 'LR' }, { x: 1200, y: 570, w: 100, h: 80, vaultDir: 'LR' }, { x: 700, y: 1100, w: 80, h: 80, vaultDir: 'UD' } ];
     const allPalletSpawns = [{ x: 200, y: 350, w: 20, h: 120, cx: 210, cy: 410 }, { x: 700, y: 150, w: 100, h: 20, cx: 750, cy: 160 }, { x: 1050, y: 750, w: 20, h: 150, cx: 1060, cy: 825 }, { x: 600, y: 750, w: 150, h: 20, cx: 675, cy: 760 }];
@@ -334,16 +348,29 @@
     function resolveSkillCheck() {
       if (!skillCheck.active) return;
       const ang = skillCheck.angle;
-      if (ang >= skillCheck.gStart && ang <= skillCheck.gEnd) { if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + 6); playTone(1200, 0.15, 'sine'); } 
-      else if (ang >= skillCheck.sStart && ang <= skillCheck.sEnd) { if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + 2); playTone(950, 0.1, 'sine'); } 
-      else { if (player.repairTarget) player.repairTarget.progress = Math.max(0, player.repairTarget.progress - 12); playTone(150, 0.4, 'sawtooth'); }
+      if (ang >= skillCheck.gStart && ang <= skillCheck.gEnd) { 
+          if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + 6); 
+          playTone(1200, 0.15, 'sine'); 
+      } 
+      else if (ang >= skillCheck.sStart && ang <= skillCheck.sEnd) { 
+          if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + 2); 
+          playTone(950, 0.1, 'sine'); 
+      } 
+      else { 
+          if (player.repairTarget) {
+              player.repairTarget.progress = Math.max(0, player.repairTarget.progress - 12); 
+              // Событие взрыва генератора для сети
+              networkEvents.push({ type: 'boom', x: player.repairTarget.x, y: player.repairTarget.y });
+          }
+          playTone(150, 0.4, 'sawtooth'); 
+      }
       skillCheck.active = false;
     }
 
     function startMatch() {
       initAudio(); const el = document.documentElement; if (!document.fullscreenElement && el.requestFullscreen) { el.requestFullscreen().catch(()=>{}); }
       gameState = 'PLAYING'; gameUI.style.display = 'block'; abilityHint.style.display = 'none';
-      scratchMarks = []; resinZones = []; fakeExplosions = []; decoys = []; abilityCd = 0;
+      scratchMarks = []; resinZones = []; fakeExplosions = []; decoys = []; abilityCd = 0; networkEvents = [];
       
       pState = { hitSprintTimer: 0 };
       if (myRole === 'KILLER') hudGens.style.display = 'none'; else hudGens.style.display = 'block';
@@ -378,25 +405,22 @@
           if (skillCheck.active) { resolveSkillCheck(); return; }
           if (player.vaulting) return;
           
-          // Прыжок через доски
           for (let p of pallets) { if (p.state === 'dropped' && Math.hypot(player.x - p.x - p.w/2, player.y - p.y - p.h/2) < 80) { startVault(p); return; } }
-          // Прыжок через окна
           for (let w of windows) { if (Math.hypot(player.x - w.x - w.w/2, player.y - w.y - w.h/2) < 80) { startVault(w); return; } }
-          // Сброс досок
           for (let p of pallets) {
             if (p.state === 'up' && Math.hypot(player.x - p.cx, player.y - p.cy) < 70) {
-                p.state = 'dropped'; playTone(200, 0.2, 'square'); 
+                p.state = 'dropped'; 
+                networkEvents.push({ type: 'palletDrop', id: pallets.indexOf(p) }); // Сетевое событие паллеты
+                playTone(200, 0.2, 'square'); 
                 if (Math.hypot(killer.x - p.cx, killer.y - p.cy) < 95 && killer.state !== 'STUNNED') { 
                     killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth'); 
                 } return; 
             }
           }
-          // Починка / Открытие сундуков
           for (let c of chests) { if (!c.isOpen && Math.hypot(player.x - c.x, player.y - c.y) < 75) { player.isRepairing = !player.isRepairing; player.repairTarget = player.isRepairing ? c : null; return; } }
           for (let g of generators) { if (!g.done && Math.hypot(player.x - g.x, player.y - g.y) < 75) { player.isRepairing = !player.isRepairing; player.repairTarget = player.isRepairing ? g : null; return; } }
           if (generators.filter(g => !g.done).length === 0 && Math.hypot(player.x - (exitGate.x+30), player.y - (exitGate.y+60)) < 95) { player.isRepairing = !player.isRepairing; player.repairTarget = player.isRepairing ? exitGate : null; }
       } else {
-          // Действия Маньяка (Слом паллет и Удар)
           if (killer.state === 'STUNNED' || killer.state === 'BREAKING') return;
           let broke = false;
           for (let p of pallets) {
@@ -420,7 +444,6 @@
       } else if (!isTouchDevice) { mouseX = e.clientX; mouseY = e.clientY; }
     });
     
-    // Блокируем клики на канвасе для мобилок, чтобы не было конфликтов с UI
     canvas.addEventListener('mousedown', (e) => {
       if (gameState !== 'PLAYING' || isTouchDevice) return;
       if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true;
@@ -466,10 +489,8 @@
       let camX = Math.max(0, Math.min(targetCamera.x - canvas.width / 2, MAP_WIDTH - canvas.width));
       let camY = Math.max(0, Math.min(targetCamera.y - canvas.height / 2, MAP_HEIGHT - canvas.height));
       
-      // Обновляем aimAngle для направления атаки маньяка
       let aimAngle;
       if (isTouchDevice && myRole === 'KILLER') {
-          // Если мы идем стиком, маньяк смотрит туда, куда идет. Иначе сохраняем старый угол.
           if (joyActive && Math.hypot(joyDelta.x, joyDelta.y) > 0.1) {
               aimAngle = Math.atan2(joyDelta.y, joyDelta.x);
           } else { aimAngle = killer.faceAngle; }
@@ -479,6 +500,12 @@
       }
 
       if(pState.hitSprintTimer > 0) pState.hitSprintTimer--;
+
+      // Чистим старые взрывы генераторов
+      for (let i = fakeExplosions.length - 1; i >= 0; i--) { 
+          fakeExplosions[i].timer--; 
+          if (fakeExplosions[i].timer <= 0) fakeExplosions.splice(i, 1); 
+      }
 
       // --- ЛОГИКА ВЫЖИВШЕГО ---
       if (myRole === 'SURVIVOR') {
@@ -506,24 +533,28 @@
                   if (!checkWall(nx, player.y, player.radius, false)) player.x = nx;
                   if (!checkWall(player.x, ny, player.radius, false)) player.y = ny;
               }
-
-              // Синхронизация с сервером
-              if (socket && isMultiplayer) socket.emit('updatePosition', { x: player.x, y: player.y, state: 'run' });
-              
               if (player.invTimer > 0) player.invTimer--;
 
               // Прогресс починки генератора / ворот
               if (player.isRepairing && player.repairTarget) {
                   if (player.repairTarget === exitGate) {
                       exitGate.progress += 0.25; 
+                      networkEvents.push({ type: 'exitUpdate', progress: exitGate.progress });
                       if (exitGate.progress >= 100) { exitGate.isOpen = true; player.isRepairing = false; }
                   } else {
                       player.repairTarget.progress += 0.16;
+                      networkEvents.push({ type: 'genUpdate', id: generators.indexOf(player.repairTarget), progress: player.repairTarget.progress });
                       if (player.repairTarget.progress >= 100) { player.repairTarget.done = true; player.isRepairing = false; playTone(880, 0.3, 'sine'); } 
                       else if (!skillCheck.active && Math.random() < 0.009) triggerSkillCheck();
                   }
               }
               if (exitGate.isOpen && player.x > exitGate.x + 25) { returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#4ade80'); }
+          }
+          
+          // Отправка данных на сервер вынесена из блока "else", чтобы координаты отсылались и во время прыжка
+          if (socket && isMultiplayer) {
+              socket.emit('updatePosition', { x: player.x, y: player.y, state: 'run', events: networkEvents });
+              networkEvents = []; // Очистка после отправки
           }
       } 
       // --- ЛОГИКА МАНЬЯКА ---
@@ -533,7 +564,12 @@
           } 
           else if (killer.state === 'BREAKING') {
               killer.timer--; if (killer.timer <= 0) { 
-                  if(killer.targetPallet) killer.targetPallet.state = 'broken'; playTone(150, 0.3, 'square'); killer.state = 'SEARCH';
+                  if(killer.targetPallet) {
+                      killer.targetPallet.state = 'broken'; 
+                      networkEvents.push({ type: 'palletBreak', id: pallets.indexOf(killer.targetPallet) }); // Уведомляем сурва о сломе
+                      playTone(150, 0.3, 'square'); 
+                      killer.state = 'SEARCH';
+                  }
               }
           }
           else if (killer.state === 'ATTACK_WINDUP') {
@@ -553,12 +589,10 @@
               let angleDiff = Math.abs(angleToPlayer - killer.faceAngle);
               if (angleDiff > Math.PI) angleDiff = 2*Math.PI - angleDiff;
 
-              // Конус атаки 60 градусов
               if (dist < (player.radius + killer.radius + 35) && angleDiff < Math.PI/3 && player.invTimer === 0) {
                   playTone(110, 0.35, 'sawtooth'); 
                   killer.state = 'ATTACK_CD'; killer.timer = 80;
                   
-                  // Локальный урон для теста оффлайн (на сервере это должно валидироваться)
                   if (!isMultiplayer) {
                       player.hp -= 1; pState.hitSprintTimer = 120; player.invTimer = 90;
                       if (player.hp <= 0) returnToLobby('ЖЕРТВА ПРИНЕСЕНА', '#4ade80');
@@ -585,7 +619,10 @@
               killer.faceAngle = aimAngle;
           }
           
-          if (socket && isMultiplayer) socket.emit('updatePosition', { x: killer.x, y: killer.y, angle: killer.faceAngle, state: killer.state });
+          if (socket && isMultiplayer) {
+              socket.emit('updatePosition', { x: killer.x, y: killer.y, angle: killer.faceAngle, state: killer.state, events: networkEvents });
+              networkEvents = [];
+          }
       }
       
       pushOutObj(killer); pushOutObj(player);
@@ -638,6 +675,16 @@
         ctx.fillStyle = g.done ? "#22c55e" : "#eab308"; ctx.fillRect(g.x-22, g.y-22, 44, 44); ctx.strokeStyle = "#fff"; ctx.strokeRect(g.x-22, g.y-22, 44, 44);
         if (!g.done && g.progress > 0) { ctx.fillStyle = "#3b82f6"; ctx.fillRect(g.x-30, g.y-35, (g.progress/100)*60, 8); }
       });
+      
+      // Взрывы генераторов (Уведомление для маньяка)
+      for (let f of fakeExplosions) {
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, 70 + Math.sin(Date.now() / 100) * 15, 0, Math.PI*2);
+          ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; ctx.fill();
+          ctx.strokeStyle = "#ff0000"; ctx.lineWidth = 4; ctx.stroke();
+          ctx.fillStyle = "#fff"; ctx.font = "bold 50px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText("!", f.x, f.y);
+      }
 
       // Сурв
       if (player.invTimer % 6 < 3) {
