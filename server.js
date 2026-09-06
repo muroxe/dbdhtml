@@ -11,10 +11,7 @@ const io = new Server(server);
 app.use(express.json());
 app.use(express.static(__dirname + '/public'));
 
-// Сюда вставь токен от BotFather (лучше перенести в Environment Variables на Render)
 const BOT_TOKEN = process.env.BOT_TOKEN || '8997366237:AAH_ZtkzP9tAHuEZ2uRbavfialF1eNdibmw';
-
-// Твоя ссылка MongoDB с убранными скобками и добавленной базой dbd_game
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://dbdhtml:lolimpivo4ka@cluster0.0jgd1gx.mongodb.net/dbd_game?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
@@ -110,6 +107,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('findMatch', (role) => {
+        // ЖЕСТКАЯ ОЧИСТКА: Удаляем сокет из всех очередей, чтобы не было дублирования матчей
+        queue.killers = queue.killers.filter(s => s.id !== socket.id);
+        queue.survivors = queue.survivors.filter(s => s.id !== socket.id);
+        
         if (role === 'KILLER') queue.killers.push(socket);
         if (role === 'SURVIVOR') queue.survivors.push(socket);
     });
