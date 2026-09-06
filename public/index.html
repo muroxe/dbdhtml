@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Dead by Daylight HTML </title>
+  <title>Dead by Daylight HTML5 - Multiplayer 4v1</title>
   
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="/socket.io/socket.io.js"></script>
@@ -196,7 +196,7 @@
     // ==========================================
     // 1. АВТОРИЗАЦИЯ
     // ==========================================
-    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot"; // <-- ЗАМЕНИТЬ НА СВОЕГО БОТА
+    const TELEGRAM_BOT_USERNAME = "ТВОЙ_BOT_USERNAME"; // <-- ЗАМЕНИТЬ НА СВОЕГО БОТА
 
     let currentUser = { id: null, name: "Гость", photo: null };
     let myAvatarImg = null;
@@ -633,7 +633,14 @@
         }
     }
 
-    document.addEventListener('mousemove', (e) => { if (!isTouchDevice && document.pointerLockElement === canvas) { mouseX += e.movementX; mouseY += e.movementY; mouseX = Math.max(0, Math.min(canvas.width, mouseX)); mouseY = Math.max(0, Math.min(canvas.height, mouseY)); } else if (!isTouchDevice) { mouseX = e.clientX; mouseY = e.clientY; } });
+    document.addEventListener('mousemove', (e) => { 
+        if (!isTouchDevice && document.pointerLockElement === canvas) { 
+            mouseX += e.movementX; mouseY += e.movementY; 
+            mouseX = Math.max(0, Math.min(canvas.width, mouseX)); mouseY = Math.max(0, Math.min(canvas.height, mouseY)); 
+        } else if (!isTouchDevice) { 
+            mouseX = e.clientX; mouseY = e.clientY; 
+        } 
+    });
     canvas.addEventListener('mousedown', (e) => { if (gameState !== 'PLAYING' || isTouchDevice) return; if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true; });
     window.addEventListener('mouseup', (e) => { if (e.button === 2) rightClickDown = false; });
     window.addEventListener('keydown', e => { 
@@ -854,7 +861,10 @@
 
       for (let sId in otherSurvivors) {
           let s = otherSurvivors[sId];
-          if (s.hp > 0) { renderAvatar({x: s.x, y: s.y, radius: 18}, "#3b82f6", s.avatarImg, s.user ? s.user.name : "Выживший"); }
+          if (s.hp > 0) { 
+              let sColor = s.hp === 1 ? "#ef4444" : "#3b82f6";
+              renderAvatar({x: s.x, y: s.y, radius: 18}, sColor, s.avatarImg, s.user ? s.user.name : "Выживший"); 
+          }
       }
 
       if (myRole === 'SURVIVOR' && player.invTimer % 6 < 3) {
@@ -874,8 +884,12 @@
       }
       ctx.restore();
 
-      if (!isTouchDevice && document.pointerLockElement !== canvas) { 
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.beginPath(); ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); ctx.fill(); 
+      // Отрисовка белого кастомного курсора (всегда рисуем на ПК)
+      if (!isTouchDevice) { 
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; 
+          ctx.beginPath(); 
+          ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); 
+          ctx.fill(); 
       }
 
       if (myRole === 'SURVIVOR' && skillCheck.active) {
