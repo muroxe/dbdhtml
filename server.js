@@ -67,26 +67,37 @@ app.post('/api/auth/telegram', async (req, res) => {
     }
 });
 
-let queue = { killers: [], survivors: [] };
+// Динамическая очередь по размерам лобби (от 2 до 5 игроков)
+let queue = {
+    2: { killers: [], survivors: [] },
+    3: { killers: [], survivors: [] },
+    4: { killers: [], survivors: [] },
+    5: { killers: [], survivors: [] }
+};
 
 setInterval(() => {
-    if (queue.killers.length > 0 && queue.survivors.length > 0) {
-        let k = queue.killers.shift();
-        let s_arr = queue.survivors.splice(0, 4); 
-        
-        let matchId = 'match_' + Date.now();
-        k.matchId = matchId;
-        k.join(matchId);
+    for (let size in queue) {
+        let s = parseInt(size);
+        let neededSurvs = s - 1;
 
-        let matchInfo = { id: matchId, killer: { id: k.id, user: k.userData }, survivors: [] };
-        
-        s_arr.forEach(s => {
-            s.matchId = matchId;
-            s.join(matchId);
-            matchInfo.survivors.push({ id: s.id, user: s.userData });
-        });
+        if (queue[size].killers.length > 0 && queue[size].survivors.length >= neededSurvs) {
+            let k = queue[size].killers.shift();
+            let s_arr = queue[size].survivors.splice(0, neededSurvs); 
+            
+            let matchId = 'match_' + Date.now();
+            k.matchId = matchId;
+            k.join(matchId);
 
-        io.to(matchId).emit('matchStarted', matchInfo);
+            let matchInfo = { id: matchId, killer: { id: k.id, user: k.userData }, survivors: [] };
+            
+            s_arr.forEach(surv => {
+                surv.matchId = matchId;
+                surv.join(matchId);
+                matchInfo.survivors.push({ id: surv.id, user: surv.userData });
+            });
+
+            io.to(matchId).emit('matchStarted', matchInfo);
+        }
     }
 }, 3000);
 
@@ -106,13 +117,18 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('findMatch', (role) => {
-        // ЖЕСТКАЯ ОЧИСТКА: Удаляем сокет из всех очередей, чтобы не было дублирования матчей
-        queue.killers = queue.killers.filter(s => s.id !== socket.id);
-        queue.survivors = queue.survivors.filter(s => s.id !== socket.id);
+    socket.on('findMatch', (data) => {
+        let role = data.role;
+        let size = data.size || 5;
+
+        // Удаляем из всех очередей, чтобы не было бага 2-х лобби
+        for (let sz in queue) {
+            queue[sz].killers = queue[sz].killers.filter(s => s.id !== socket.id);
+            queue[sz].survivors = queue[sz].survivors.filter(s => s.id !== socket.id);
+        }
         
-        if (role === 'KILLER') queue.killers.push(socket);
-        if (role === 'SURVIVOR') queue.survivors.push(socket);
+        if (role === 'KILLER') queue[size].killers.push(socket);
+        if (role === 'SURVIVOR') queue[size].survivors.push(socket);
     });
 
     socket.on('updatePosition', (data) => {
@@ -130,16 +146,20 @@ io.on('connection', (socket) => {
             socket.leave(socket.matchId);
             socket.matchId = null;
         }
-        queue.killers = queue.killers.filter(s => s.id !== socket.id);
-        queue.survivors = queue.survivors.filter(s => s.id !== socket.id);
+        for (let sz in queue) {
+            queue[sz].killers = queue[sz].killers.filter(s => s.id !== socket.id);
+            queue[sz].survivors = queue[sz].survivors.filter(s => s.id !== socket.id);
+        }
     });
 
     socket.on('disconnect', () => {
         if (socket.matchId) {
             socket.to(socket.matchId).emit('playerDisconnected', socket.id);
         }
-        queue.killers = queue.killers.filter(s => s.id !== socket.id);
-        queue.survivors = queue.survivors.filter(s => s.id !== socket.id);
+        for (let sz in queue) {
+            queue[sz].killers = queue[sz].killers.filter(s => s.id !== socket.id);
+            queue[sz].survivors = queue[sz].survivors.filter(s => s.id !== socket.id);
+        }
     });
 });
 
