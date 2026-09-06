@@ -175,8 +175,8 @@
     <div id="game-ui">
       <div id="hud">
         <div id="hud-gens">ГЕНЕРАТОРЫ: <span id="gens-left">4</span></div>
-        <div>СТАТУС: <span id="player-hp">ЗДОРОВ</span></div>
-        <div>ПРЕДМЕТ: <span id="hud-item">НЕТ</span></div>
+        <div id="hud-status-wrap">СТАТУС: <span id="player-hp">ЗДОРОВ</span></div>
+        <div id="hud-item-wrap">ПРЕДМЕТ: <span id="hud-item">НЕТ</span></div>
       </div>
       <div id="status-effects"></div>
       <div id="ability-hint" style="display: none;">
@@ -550,13 +550,22 @@
       initAudio();
       gameState = 'PLAYING';
       document.getElementById('game-ui').style.display = 'block';
+      
+      document.getElementById('hud-gens').style.display = 'block';
+      if (myRole === 'KILLER') {
+          document.getElementById('hud-status-wrap').style.display = 'none';
+          document.getElementById('hud-item-wrap').style.display = 'none';
+      } else {
+          document.getElementById('hud-status-wrap').style.display = 'block';
+          document.getElementById('hud-item-wrap').style.display = 'block';
+      }
+      
       document.getElementById('ability-hint').style.display = 'block';
+      document.getElementById('hint-f-text').style.display = isTouchDevice ? 'none' : 'inline';
+
       fakeExplosions = []; networkEvents = [];
       pState = { hitSprintTimer: 0 };
       
-      document.getElementById('hud-gens').style.display = myRole === 'KILLER' ? 'none' : 'block';
-      document.getElementById('hint-f-text').style.display = isTouchDevice ? 'none' : 'inline';
-
       player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0;
       generators = [ {x: 260, y: 550}, {x: 950, y: 350}, {x: 600, y: 950}, {x: 1450, y: 850} ].map(g => ({x: g.x, y: g.y, progress: 0, done: false}));
       pallets = allPalletSpawns.map(p => ({...p, state: 'up'}));
@@ -677,8 +686,8 @@
       if (gameState !== 'PLAYING') return;
 
       let targetCamera = myRole === 'SURVIVOR' ? player : killer;
-      camera.x = Math.max(0, Math.min(targetCamera.x - canvas.width / 2, MAP_WIDTH - canvas.width));
-      camera.y = Math.max(0, Math.min(targetCamera.y - canvas.height / 2, MAP_HEIGHT - canvas.height));
+      camera.x = Math.max(0, Math.min(targetCamera.x - cx, MAP_WIDTH - canvas.width));
+      camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
       
       let aimAngle;
       if (isTouchDevice && myRole === 'KILLER') { if (window.joyDelta && Math.hypot(window.joyDelta.x, window.joyDelta.y) > 0.1) aimAngle = Math.atan2(window.joyDelta.y, window.joyDelta.x); else aimAngle = killer.faceAngle; } 
