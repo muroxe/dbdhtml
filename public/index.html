@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Dead by Daylight HTML5 - Telegram Auth</title>
+  <title>Dead by Daylight HTML </title>
   
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="/socket.io/socket.io.js"></script>
@@ -181,7 +181,7 @@
       <div id="status-effects"></div>
       <div id="ability-hint" style="display: none;">
         <span id="hint-e-text">[E] / НАВЫК</span><br>
-        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть курсор</span>
+        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть системный курсор мыши</span>
       </div>
       
       <div id="mobile-controls">
@@ -194,14 +194,12 @@
 
   <script>
     // ==========================================
-    // 1. АВТОРИЗАЦИЯ И ДАННЫЕ
+    // 1. АВТОРИЗАЦИЯ
     // ==========================================
-    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot"; // <-- Замени на своего бота без @
+    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot"; // <-- ЗАМЕНИТЬ НА СВОЕГО БОТА
 
     let currentUser = { id: null, name: "Гость", photo: null };
     let myAvatarImg = null;
-    let enemyUser = { name: "Оппонент", photo: null };
-    let enemyAvatarImg = null;
 
     window.onTelegramAuth = async function(user) {
         try {
@@ -211,8 +209,10 @@
                 body: JSON.stringify(user)
             });
             const data = await resp.json();
-            if (data.success) { applyUser(data.user); } 
-            else { alert('Ошибка авторизации: ' + (data.error || 'Неизвестная ошибка')); }
+            if (data.success) { 
+                if (data.progress) progress = data.progress; 
+                applyUser(data.user); 
+            } else { alert('Ошибка авторизации: ' + (data.error || 'Неизвестная ошибка')); }
         } catch (e) {
             applyUser({ id: user.id, name: user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim(), photo: user.photo_url || null });
         }
@@ -242,7 +242,7 @@
 
     function logoutUser() {
         localStorage.removeItem('dbd_saved_user');
-        location.reload(); // Перезагружаем страницу для очистки сессии
+        location.reload(); 
     }
 
     function initAuth() {
@@ -269,18 +269,9 @@
     // ==========================================
     let progress = { chars: ['s_base', 'k_ill'], perks: ['s1', 'k1'] };
     
-    function loadProgress() {
-        let saved = localStorage.getItem('dbdProgress');
-        if (saved) { 
-            try { 
-                progress = JSON.parse(saved); 
-                // Ретроактивно выдаем нового базового перса, если у игрока старое сохранение
-                if (!progress.chars.includes('s_base')) progress.chars.push('s_base');
-            } catch(e){} 
-        }
+    function saveProgress() { 
+        if (socket) socket.emit('saveProgress', progress); 
     }
-    function saveProgress() { localStorage.setItem('dbdProgress', JSON.stringify(progress)); }
-    loadProgress();
 
     function unlockRandomReward(role) {
         let isSurvivor = role === 'SURVIVOR';
@@ -304,31 +295,52 @@
     }
 
     // ==========================================
-    // 3. МУЛЬТИПЛЕЕР И SOCKET.IO
+    // 3. МУЛЬТИПЛЕЕР 4v1 И SOCKET.IO
     // ==========================================
     const socket = typeof io !== 'undefined' ? io() : null;
     let isMultiplayer = false;
     let networkEvents = [];
+    let otherSurvivors = {}; 
+    let kId = null;
 
     if (socket) {
         socket.on('matchStarted', (data) => {
             document.getElementById('matchmaking-screen').style.display = 'none';
             isMultiplayer = true;
-            if (data && data.enemyUser) {
-                enemyUser = data.enemyUser;
-                if (enemyUser.photo) {
-                    enemyAvatarImg = new Image();
-                    enemyAvatarImg.crossOrigin = "Anonymous";
-                    enemyAvatarImg.src = enemyUser.photo;
+            otherSurvivors = {};
+
+            if (myRole === 'SURVIVOR') {
+                kId = data.killer.id;
+                killer.user = data.killer.user;
+                if (killer.user && killer.user.photo) {
+                    killer.avatarImg = new Image(); killer.avatarImg.crossOrigin = "Anonymous"; killer.avatarImg.src = killer.user.photo;
                 }
+                data.survivors.forEach(s => {
+                    if (s.id !== socket.id) {
+                        let img = null;
+                        if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
+                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img };
+                    }
+                });
+            } else {
+                data.survivors.forEach(s => {
+                    let img = null;
+                    if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
+                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img };
+                });
             }
             startMatch();
         });
 
-        socket.on('enemyPosition', (data) => {
+        socket.on('playerUpdated', (data) => {
             if (gameState !== 'PLAYING') return;
-            if (myRole === 'SURVIVOR') { killer.x = data.x; killer.y = data.y; killer.faceAngle = data.angle; killer.state = data.state; } 
-            else { player.x = data.x; player.y = data.y; if (data.hp !== undefined) player.hp = data.hp; }
+
+            if (myRole === 'SURVIVOR' && data.id === kId) { 
+                killer.x = data.x; killer.y = data.y; killer.faceAngle = data.angle; killer.state = data.state; 
+            } else if (otherSurvivors[data.id]) { 
+                otherSurvivors[data.id].x = data.x; otherSurvivors[data.id].y = data.y; 
+                if (data.hp !== undefined) otherSurvivors[data.id].hp = data.hp; 
+            }
 
             if (data.events && data.events.length > 0) {
                 for (let e of data.events) {
@@ -340,22 +352,37 @@
                     if (e.type === 'chestOpen' && chests[e.id]) chests[e.id].isOpen = true;
                     if (e.type === 'boom') { fakeExplosions.push({ x: e.x, y: e.y, timer: 180 }); playTone(150, 0.4, 'sawtooth'); }
                     
-                    if (myRole === 'SURVIVOR' && e.type === 'hit') {
-                        if (player.invTimer === 0 && player.hp > 0) {
-                            player.hp -= 1; player.invTimer = 90; pState.hitSprintTimer = 120; playTone(150, 0.5, 'sawtooth');
-                            if (player.hp <= 0) {
-                                socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, events: [{type: 'dead'}] });
-                                returnToLobby('ПРИНЕСЕН В ЖЕРТВУ', '#ff3333');
-                            }
+                    if (e.type === 'dead') {
+                        if (myRole === 'KILLER') {
+                            let reward = unlockRandomReward('KILLER');
+                            returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80');
                         }
                     }
-                    if (myRole === 'KILLER' && e.type === 'dead') { let reward = unlockRandomReward('KILLER'); returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80'); }
-                    if (myRole === 'KILLER' && e.type === 'escaped') { returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444'); }
+                    if (e.type === 'escaped') {
+                        if (myRole === 'KILLER') returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444');
+                    }
                 }
             }
         });
 
-        socket.on('enemyDisconnected', () => { if (gameState === 'PLAYING') returnToLobby('ОППОНЕНТ ОТКЛЮЧИЛСЯ', '#ffaa00'); });
+        socket.on('youGotHit', () => {
+            if (player.invTimer === 0 && player.hp > 0) {
+                player.hp -= 1; player.invTimer = 90; pState.hitSprintTimer = 120; playTone(150, 0.5, 'sawtooth');
+                if (player.hp <= 0) {
+                    socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, events: [{type: 'dead'}] });
+                    returnToLobby('ПРИНЕСЕН В ЖЕРТВУ', '#ff3333');
+                } else {
+                    socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp });
+                }
+            }
+        });
+
+        socket.on('playerDisconnected', (id) => {
+            if (gameState === 'PLAYING') {
+                if (id === kId) { returnToLobby('МАНЬЯК СБЕЖАЛ. ВЫ ПОБЕДИЛИ!', '#4ade80'); }
+                else if (otherSurvivors[id]) { delete otherSurvivors[id]; }
+            }
+        });
     }
 
     function joinQueue() {
@@ -365,13 +392,18 @@
         else { console.warn("Socket.io недоступен, запустите локальный тест."); }
     }
 
-    function forceStartMatch() { document.getElementById('matchmaking-screen').style.display = 'none'; isMultiplayer = false; startMatch(); }
+    function forceStartMatch() { 
+        document.getElementById('matchmaking-screen').style.display = 'none'; 
+        isMultiplayer = false; 
+        otherSurvivors = {};
+        startMatch(); 
+    }
 
     // ==========================================
     // 4. ДАННЫЕ ПЕРСОНАЖЕЙ И ПЕРКОВ
     // ==========================================
     const survivorsData = [
-      { id: 's_base', name: 'Новичок', color: '#94a3b8', desc: 'Без особых способностей' },
+      { id: 's_base', name: 'Новичок', color: '#94a3b8', desc: 'Обычный выживший' },
       { id: 's_hack', name: 'Хакер', color: '#22c55e', desc: 'Починка быстрее на 15%' },
       { id: 's_acro', name: 'Акробатка', color: '#ec4899', desc: 'Прыжки быстрее на 30%' },
       { id: 's_vet', name: 'Ветеран', color: '#1d4ed8', desc: 'Начинает с инструментами' },
@@ -540,6 +572,7 @@
         document.getElementById('lobby-status').innerText = text;
         document.getElementById('lobby-status').style.color = color; 
         document.exitPointerLock(); 
+        if (socket && isMultiplayer) socket.emit('leaveMatch');
     }
     
     function startVault(obj) {
@@ -705,13 +738,21 @@
               if (!checkWall(killer.x + killer.vx, killer.y, killer.radius, true, false)) killer.x += killer.vx;
               if (!checkWall(killer.x, killer.y + killer.vy, killer.radius, true, false)) killer.y += killer.vy;
               
-              let dist = Math.hypot(player.x - killer.x, player.y - killer.y), angleToPlayer = Math.atan2(player.y - killer.y, player.x - killer.x), angleDiff = Math.abs(angleToPlayer - killer.faceAngle);
-              if (angleDiff > Math.PI) angleDiff = 2*Math.PI - angleDiff;
+              let targets = isMultiplayer ? Object.entries(otherSurvivors).map(([id, s]) => ({id, ...s})) : [{id: 'local', ...player}];
+              
+              for (let s of targets) {
+                  let dist = Math.hypot(s.x - killer.x, s.y - killer.y), angleToPlayer = Math.atan2(s.y - killer.y, s.x - killer.x), angleDiff = Math.abs(angleToPlayer - killer.faceAngle);
+                  if (angleDiff > Math.PI) angleDiff = 2*Math.PI - angleDiff;
 
-              if (dist < (player.radius + killer.radius + 35) && angleDiff < Math.PI/3) {
-                  playTone(110, 0.35, 'sawtooth'); killer.state = 'ATTACK_CD'; killer.timer = 80;
-                  if (!isMultiplayer) { if (player.invTimer === 0 && player.hp > 0) { player.hp -= 1; pState.hitSprintTimer = 120; player.invTimer = 90; if (player.hp <= 0) { let reward = unlockRandomReward('KILLER'); returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80'); } } } 
-                  else { networkEvents.push({ type: 'hit' }); }
+                  if (dist < ((s.radius||18) + killer.radius + 35) && angleDiff < Math.PI/3 && s.hp > 0) {
+                      playTone(110, 0.35, 'sawtooth'); killer.state = 'ATTACK_CD'; killer.timer = 80;
+                      if (!isMultiplayer) { 
+                          if (player.invTimer === 0 && player.hp > 0) { player.hp -= 1; pState.hitSprintTimer = 120; player.invTimer = 90; if (player.hp <= 0) { let reward = unlockRandomReward('KILLER'); returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80'); } } 
+                      } else { 
+                          socket.emit('hitPlayer', s.id); 
+                      }
+                      break; 
+                  }
               }
               if (killer.timer <= 0 && killer.state === 'ATTACK_LUNGE') { killer.state = 'ATTACK_CD'; killer.timer = 45; }
           }
@@ -811,16 +852,19 @@
           }
       }
 
-      if (player.invTimer % 6 < 3) {
-          let pColor = player.hp === 1 ? "#ef4444" : (myCharData ? myCharData.color : '#94a3b8');
-          let pName = (myRole === 'SURVIVOR') ? currentUser.name : enemyUser.name;
-          let pAvatar = (myRole === 'SURVIVOR') ? myAvatarImg : enemyAvatarImg;
-          renderAvatar(player, pColor, pAvatar, pName);
+      for (let sId in otherSurvivors) {
+          let s = otherSurvivors[sId];
+          if (s.hp > 0) { renderAvatar({x: s.x, y: s.y, radius: 18}, "#3b82f6", s.avatarImg, s.user ? s.user.name : "Выживший"); }
       }
 
-      let kColor = killer.state === 'STUNNED' ? "#f59e0b" : (myCharData ? myCharData.color : '#991b1b');
-      let kName = (myRole === 'KILLER') ? currentUser.name : enemyUser.name;
-      let kAvatar = (myRole === 'KILLER') ? myAvatarImg : enemyAvatarImg;
+      if (myRole === 'SURVIVOR' && player.invTimer % 6 < 3) {
+          let pColor = player.hp === 1 ? "#ef4444" : (myCharData ? myCharData.color : '#94a3b8');
+          renderAvatar(player, pColor, myAvatarImg, currentUser.name);
+      }
+
+      let kColor = killer.state === 'STUNNED' ? "#f59e0b" : (myRole === 'KILLER' ? (myCharData ? myCharData.color : '#991b1b') : '#991b1b');
+      let kName = (myRole === 'KILLER') ? currentUser.name : (killer.user ? killer.user.name : "Маньяк");
+      let kAvatar = (myRole === 'KILLER') ? myAvatarImg : killer.avatarImg;
       renderAvatar(killer, kColor, kAvatar, kName);
       
       if (killer.state !== 'STUNNED' && killer.state !== 'BREAKING') {
