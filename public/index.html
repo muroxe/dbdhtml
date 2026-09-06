@@ -115,20 +115,16 @@
     </div>
     <button id="fullscreen-btn" class="ui-btn" onclick="toggleFullscreen(event)">⛶ Экран</button>
 
-    <!-- Экран авторизации -->
     <div id="auth-screen" class="screen">
       <div class="auth-box">
         <h2 style="margin-top:0; color:#ff4444;">ВХОД В ИГРУ</h2>
         <p style="font-size:14px; color:#bbb; margin-bottom: 20px;">Авторизуйтесь через Telegram, чтобы получить аватарку и сохранять свой прогресс</p>
-        
         <div id="telegram-widget-container" style="display:flex; justify-content:center; margin-bottom:15px;"></div>
-        
         <div style="margin: 15px 0; color:#666; font-size:12px;">— ИЛИ —</div>
         <button class="ui-btn" style="width:100%; font-size:12px;" onclick="continueAsGuest()">Продолжить как гость</button>
       </div>
     </div>
     
-    <!-- Главное меню -->
     <div id="main-menu" class="screen" style="display:none;">
       <h1>DEAD BY DAYLIGHT</h1>
       <div id="user-profile-bar" class="user-card-preview" style="width: 350px;">
@@ -147,14 +143,12 @@
       <div id="lobby-status" style="color:#fff; font-size:20px; font-weight:bold; margin-top:20px; white-space:pre-line; text-align:center;"></div>
     </div>
 
-    <!-- Меню персонажей -->
     <div id="char-menu" class="screen">
       <h2 style="color:#fff; margin-bottom: 20px;">ВЫБЕРИТЕ ПЕРСОНАЖА</h2>
       <div id="char-list"></div>
       <button class="ui-btn" style="margin-top: 20px;" onclick="document.getElementById('char-menu').style.display='none'; document.getElementById('main-menu').style.display='flex';">НАЗАД</button>
     </div>
 
-    <!-- Меню перков -->
     <div id="perk-menu" class="screen">
       <h2 id="perk-menu-title">ВЫБЕРИТЕ ПЕРКИ (0/4)</h2>
       <div id="perk-list"></div>
@@ -164,14 +158,12 @@
       </div>
     </div>
 
-    <!-- Экран матчмейкинга -->
     <div id="matchmaking-screen" class="screen">
       <h2>ПОИСК ОППОНЕНТА...</h2>
       <p style="color:#aaa; margin-top:10px;">Ожидание подключения сервера...</p>
       <button class="ui-btn" style="margin-top: 20px; background:#444;" onclick="forceStartMatch()">ИГРАТЬ ОФФЛАЙН (ТЕСТ)</button>
     </div>
 
-    <!-- HUD -->
     <div id="game-ui">
       <div id="hud">
         <div id="hud-gens">ГЕНЕРАТОРЫ: <span id="gens-left">4</span></div>
@@ -193,9 +185,6 @@
   </div>
 
   <script>
-    // ==========================================
-    // 1. АВТОРИЗАЦИЯ
-    // ==========================================
     const TELEGRAM_BOT_USERNAME = "ТВОЙ_BOT_USERNAME"; // <-- ЗАМЕНИТЬ НА СВОЕГО БОТА
 
     let currentUser = { id: null, name: "Гость", photo: null };
@@ -264,14 +253,9 @@
         container.appendChild(script);
     }
 
-    // ==========================================
-    // 2. ПРОГРЕССИЯ
-    // ==========================================
     let progress = { chars: ['s_base', 'k_ill'], perks: ['s1', 'k1'] };
     
-    function saveProgress() { 
-        if (socket) socket.emit('saveProgress', progress); 
-    }
+    function saveProgress() { if (socket) socket.emit('saveProgress', progress); }
 
     function unlockRandomReward(role) {
         let isSurvivor = role === 'SURVIVOR';
@@ -294,9 +278,6 @@
         saveProgress(); return rewardMsg;
     }
 
-    // ==========================================
-    // 3. МУЛЬТИПЛЕЕР 4v1 И SOCKET.IO
-    // ==========================================
     const socket = typeof io !== 'undefined' ? io() : null;
     let isMultiplayer = false;
     let networkEvents = [];
@@ -399,9 +380,6 @@
         startMatch(); 
     }
 
-    // ==========================================
-    // 4. ДАННЫЕ ПЕРСОНАЖЕЙ И ПЕРКОВ
-    // ==========================================
     const survivorsData = [
       { id: 's_base', name: 'Новичок', color: '#94a3b8', desc: 'Обычный выживший' },
       { id: 's_hack', name: 'Хакер', color: '#22c55e', desc: 'Починка быстрее на 15%' },
@@ -482,9 +460,6 @@
         });
     }
 
-    // ==========================================
-    // 5. ИГРОВОЙ ПРОЦЕСС И ОТРИСОВКА
-    // ==========================================
     const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
     const player = { x: 0, y: 0, radius: 18, speed: 4.0, hp: 2, isRepairing: false, repairTarget: null, invTimer: 0, angle: Math.PI/2, item: null, charge: 0, vaulting: false, vaultProgress: 0, vaultStartX: 0, vaultStartY: 0, vaultEndX: 0, vaultEndY: 0, moving: false };
     const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI };
@@ -685,6 +660,9 @@
     function update() {
       if (gameState !== 'PLAYING') return;
 
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+
       let targetCamera = myRole === 'SURVIVOR' ? player : killer;
       camera.x = Math.max(0, Math.min(targetCamera.x - cx, MAP_WIDTH - canvas.width));
       camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
@@ -812,11 +790,11 @@
     function render() {
       if (gameState !== 'PLAYING') return;
       ctx.clearRect(0, 0, canvas.width, canvas.height); 
-      const cx = canvas.width / 2, cy = canvas.height / 2;
+      
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
       
       let targetCamera = myRole === 'SURVIVOR' ? player : killer;
-      camera.x = Math.max(0, Math.min(targetCamera.x - cx, MAP_WIDTH - canvas.width)); 
-      camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
       
       ctx.save(); ctx.translate(-camera.x, -camera.y);
 
