@@ -1,13 +1,14 @@
 {
   "name": "dbd-web",
   "version": "1.0.0",
-  "description": "DBD HTML5 Multiplayer",
+  "description": "DBD HTML",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
+    "mongoose": "^8.0.0",
     "socket.io": "^4.7.2"
   }
 }
