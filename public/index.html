@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Dead by Daylight HTML5 - Multiplayer 4v1</title>
+  <title>Dead by Daylight HTML5 - Ultimate 4v1</title>
   
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="/socket.io/socket.io.js"></script>
@@ -86,7 +86,7 @@
     #hud { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0, 0, 0, 0.8); padding: 10px 20px; border-radius: 12px; border: 1px solid #444; font-size: 14px; font-weight: bold; }
     #hud span { color: #ff4444; }
     #hud-item { color: #60a5fa !important; }
-    #ability-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; font-size: 18px; font-weight: bold; color: #e1bee7; text-shadow: 1px 1px 2px #000; }
+    #ability-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; font-size: 18px; font-weight: bold; color: #e1bee7; text-shadow: 1px 1px 2px #000; display: none; }
     
     #status-effects { position: absolute; right: 20px; top: 70px; display: flex; flex-direction: column; gap: 8px; z-index: 150; }
     .effect-badge { background: rgba(20, 20, 20, 0.85); border-left: 4px solid #fff; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.5); text-transform: uppercase; }
@@ -96,7 +96,7 @@
     #joystick-stick { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255, 255, 255, 0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: 0.05s ease-out; }
     .mob-action-btn { position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; background: rgba(255, 68, 68, 0.4); border: 2px solid #ff4444; border-radius: 50%; pointer-events: auto; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
     .mob-action-btn:active { background: rgba(255, 68, 68, 0.8); }
-    #mob-ability-btn { bottom: 130px; right: 30px; background: rgba(139, 92, 246, 0.4); border-color: #8b5cf6; width: 60px; height: 60px; font-size: 12px; }
+    #mob-ability-btn { bottom: 130px; right: 30px; background: rgba(139, 92, 246, 0.4); border-color: #8b5cf6; width: 60px; height: 60px; font-size: 12px; display: none; }
     #mob-ability-btn:active { background: rgba(139, 92, 246, 0.8); }
 
     ::-webkit-scrollbar { width: 8px; }
@@ -171,9 +171,9 @@
         <div id="hud-item-wrap">ПРЕДМЕТ: <span id="hud-item">НЕТ</span></div>
       </div>
       <div id="status-effects"></div>
-      <div id="ability-hint" style="display: none;">
+      <div id="ability-hint">
         <span id="hint-e-text">[E] / НАВЫК</span><br>
-        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть системный курсор мыши</span>
+        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть курсор мыши</span>
       </div>
       
       <div id="mobile-controls">
@@ -185,6 +185,9 @@
   </div>
 
   <script>
+    // ==========================================
+    // 1. АВТОРИЗАЦИЯ
+    // ==========================================
     const TELEGRAM_BOT_USERNAME = "ТВОЙ_BOT_USERNAME"; // <-- ЗАМЕНИТЬ НА СВОЕГО БОТА
 
     let currentUser = { id: null, name: "Гость", photo: null };
@@ -192,52 +195,29 @@
 
     window.onTelegramAuth = async function(user) {
         try {
-            const resp = await fetch('/api/auth/telegram', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(user)
-            });
+            const resp = await fetch('/api/auth/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(user) });
             const data = await resp.json();
-            if (data.success) { 
-                if (data.progress) progress = data.progress; 
-                applyUser(data.user); 
-            } else { alert('Ошибка авторизации: ' + (data.error || 'Неизвестная ошибка')); }
-        } catch (e) {
-            applyUser({ id: user.id, name: user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim(), photo: user.photo_url || null });
-        }
+            if (data.success) { if (data.progress) progress = data.progress; applyUser(data.user); } 
+            else { alert('Ошибка авторизации: ' + (data.error || 'Неизвестная ошибка')); }
+        } catch (e) { applyUser({ id: user.id, name: user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim(), photo: user.photo_url || null }); }
     };
 
     function applyUser(u) {
-        currentUser = u;
-        localStorage.setItem('dbd_saved_user', JSON.stringify(currentUser));
-        if (currentUser.photo) {
-            myAvatarImg = new Image();
-            myAvatarImg.crossOrigin = "Anonymous";
-            myAvatarImg.src = currentUser.photo;
-        }
+        currentUser = u; localStorage.setItem('dbd_saved_user', JSON.stringify(currentUser));
+        if (currentUser.photo) { myAvatarImg = new Image(); myAvatarImg.crossOrigin = "Anonymous"; myAvatarImg.src = currentUser.photo; }
         document.getElementById('user-name-preview').innerText = currentUser.name;
         const imgEl = document.getElementById('user-avatar-preview');
-        if (currentUser.photo) { imgEl.src = currentUser.photo; imgEl.style.display = 'block'; } 
-        else { imgEl.style.display = 'none'; }
-        document.getElementById('auth-screen').style.display = 'none';
-        document.getElementById('main-menu').style.display = 'flex';
+        if (currentUser.photo) { imgEl.src = currentUser.photo; imgEl.style.display = 'block'; } else { imgEl.style.display = 'none'; }
+        document.getElementById('auth-screen').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex';
         if (socket) socket.emit('setUserData', currentUser);
     }
 
-    function continueAsGuest() {
-        const guestId = Math.floor(Math.random() * 9000) + 1000;
-        applyUser({ id: guestId, name: `Гость_${guestId}`, photo: null });
-    }
-
-    function logoutUser() {
-        localStorage.removeItem('dbd_saved_user');
-        location.reload(); 
-    }
+    function continueAsGuest() { applyUser({ id: Math.floor(Math.random() * 9000) + 1000, name: `Гость_${Math.floor(Math.random() * 9000) + 1000}`, photo: null }); }
+    function logoutUser() { localStorage.removeItem('dbd_saved_user'); location.reload(); }
 
     function initAuth() {
         if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
-            const u = Telegram.WebApp.initDataUnsafe.user;
-            Telegram.WebApp.expand();
+            const u = Telegram.WebApp.initDataUnsafe.user; Telegram.WebApp.expand();
             applyUser({ id: u.id, name: u.username || `${u.first_name || ''} ${u.last_name || ''}`.trim(), photo: u.photo_url || null });
             return;
         }
@@ -245,14 +225,14 @@
         if (saved) { try { applyUser(JSON.parse(saved)); return; } catch(e){} }
         
         const container = document.getElementById('telegram-widget-container');
-        const script = document.createElement('script');
-        script.async = true; script.src = "https://telegram.org/js/telegram-widget.js?22";
-        script.setAttribute('data-telegram-login', TELEGRAM_BOT_USERNAME);
-        script.setAttribute('data-size', 'large'); script.setAttribute('data-radius', '8');
-        script.setAttribute('data-onauth', 'onTelegramAuth(user)'); script.setAttribute('data-request-access', 'write');
-        container.appendChild(script);
+        const script = document.createElement('script'); script.async = true; script.src = "https://telegram.org/js/telegram-widget.js?22";
+        script.setAttribute('data-telegram-login', TELEGRAM_BOT_USERNAME); script.setAttribute('data-size', 'large'); script.setAttribute('data-radius', '8');
+        script.setAttribute('data-onauth', 'onTelegramAuth(user)'); script.setAttribute('data-request-access', 'write'); container.appendChild(script);
     }
 
+    // ==========================================
+    // 2. ПРОГРЕССИЯ
+    // ==========================================
     let progress = { chars: ['s_base', 'k_ill'], perks: ['s1', 'k1'] };
     
     function saveProgress() { if (socket) socket.emit('saveProgress', progress); }
@@ -278,17 +258,32 @@
         saveProgress(); return rewardMsg;
     }
 
+    // ==========================================
+    // 3. МУЛЬТИПЛЕЕР И СИСТЕМА СИДОВ
+    // ==========================================
     const socket = typeof io !== 'undefined' ? io() : null;
     let isMultiplayer = false;
     let networkEvents = [];
     let otherSurvivors = {}; 
     let kId = null;
+    let matchSeed = 12345;
+
+    function seededRandom() {
+        matchSeed = (matchSeed * 9301 + 49297) % 233280;
+        return matchSeed / 233280;
+    }
 
     if (socket) {
         socket.on('matchStarted', (data) => {
             document.getElementById('matchmaking-screen').style.display = 'none';
             isMultiplayer = true;
             otherSurvivors = {};
+
+            if (data && data.id) {
+                let hash = 0;
+                for (let i = 0; i < data.id.length; i++) hash = Math.imul(31, hash) + data.id.charCodeAt(i) | 0;
+                matchSeed = Math.abs(hash);
+            }
 
             if (myRole === 'SURVIVOR') {
                 kId = data.killer.id;
@@ -300,14 +295,14 @@
                     if (s.id !== socket.id) {
                         let img = null;
                         if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
-                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img };
+                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, blindTimer: 0 };
                     }
                 });
             } else {
                 data.survivors.forEach(s => {
                     let img = null;
                     if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
-                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img };
+                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, blindTimer: 0 };
                 });
             }
             startMatch();
@@ -333,14 +328,40 @@
                     if (e.type === 'chestOpen' && chests[e.id]) chests[e.id].isOpen = true;
                     if (e.type === 'boom') { fakeExplosions.push({ x: e.x, y: e.y, timer: 180 }); playTone(150, 0.4, 'sawtooth'); }
                     
-                    if (e.type === 'dead') {
-                        if (myRole === 'KILLER') {
-                            let reward = unlockRandomReward('KILLER');
-                            returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80');
+                    if (e.type === 'ability_decoy') { decoys.push({ x: e.x, y: e.y, timer: 600 }); playTone(400, 0.3, 'sine'); }
+                    if (e.type === 'ability_slow' && myRole === 'SURVIVOR') {
+                        if (Math.hypot(player.x - e.x, player.y - e.y) < 350) pState.slowTimer = 180;
+                        playTone(800, 0.6, 'square');
+                    }
+                    if (e.type === 'ability_pull' && myRole === 'SURVIVOR') {
+                        if (Math.hypot(player.x - e.x, player.y - e.y) < 400 && checkLOS(player.x, player.y, e.x, e.y)) {
+                            let ang = Math.atan2(e.y - player.y, e.x - player.x);
+                            player.x += Math.cos(ang) * 100; player.y += Math.sin(ang) * 100;
+                            playTone(200, 0.4, 'triangle');
                         }
                     }
-                    if (e.type === 'escaped') {
-                        if (myRole === 'KILLER') returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444');
+                    if (e.type === 'perk_resin') { resinZones.push({ x: e.x, y: e.y, timer: 1200 }); }
+                    if (e.type === 'perk_blind' && myRole === 'SURVIVOR') { pState.blindTimer = 300; }
+                    if (e.type === 'perk_ruin' && myRole === 'SURVIVOR') {
+                        let bestGen = generators.filter(g => !g.done).sort((a,b) => b.progress - a.progress)[0];
+                        if (bestGen) { bestGen.progress = Math.max(0, bestGen.progress - 15); fakeExplosions.push({x: bestGen.x, y: bestGen.y, timer: 180}); }
+                    }
+
+                    if (myRole === 'SURVIVOR' && e.type === 'hit') {
+                        if (player.invTimer === 0 && player.hp > 0) {
+                            player.hp -= 1; player.invTimer = 90; pState.hitSprintTimer = 120; playTone(150, 0.5, 'sawtooth');
+                            if (player.hp <= 0) {
+                                socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, events: [{type: 'dead'}] });
+                                returnToLobby('ПРИНЕСЕН В ЖЕРТВУ', '#ff3333');
+                            }
+                        }
+                    }
+                    if (myRole === 'KILLER' && e.type === 'dead') {
+                        let reward = unlockRandomReward('KILLER');
+                        returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80');
+                    }
+                    if (myRole === 'KILLER' && e.type === 'escaped') {
+                        returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444');
                     }
                 }
             }
@@ -377,9 +398,13 @@
         document.getElementById('matchmaking-screen').style.display = 'none'; 
         isMultiplayer = false; 
         otherSurvivors = {};
+        matchSeed = Math.floor(Math.random() * 100000);
         startMatch(); 
     }
 
+    // ==========================================
+    // 4. ДАННЫЕ ПЕРСОНАЖЕЙ И ПЕРКОВ
+    // ==========================================
     const survivorsData = [
       { id: 's_base', name: 'Новичок', color: '#94a3b8', desc: 'Обычный выживший' },
       { id: 's_hack', name: 'Хакер', color: '#22c55e', desc: 'Починка быстрее на 15%' },
@@ -394,12 +419,12 @@
       { id: 'k_pup', name: 'Кукловод', color: '#f97316', desc: '[E] Притягивает к себе жертву' }
     ];
     const sPerks = [
-      {id:'s1', name:'Инстинкт добычи', desc:'Первые 3 сек погони прыжок быстрее на 10%.'},
+      {id:'s1', name:'Инстинкт добычи', desc:'При получении ранения дает огромный прыжок скорости.'},
       {id:'s2', name:'Взрывной ремонт', desc:'Долгая починка дает скрытый бафф проверок.'},
-      {id:'s3', name:'Слепое пятно', desc:'Сброс слежки Убийцы при стоянии в радиусе.'},
+      {id:'s3', name:'Слепое пятно', desc:'Скрывает вашу ауру и тело для маньяка, если вы долго стоите на месте.'},
       {id:'s4', name:'Адреналиновый рывок', desc:'Ускорение после удара длится дольше.'},
-      {id:'s6', name:'Тайник в земле', desc:'Можно спрятать предмет в землю.'},
-      {id:'s7', name:'Хладнокровная маскировка', desc:'Оглушение доской дает бафф скорости.'},
+      {id:'s6', name:'Тайник в земле', desc:'Нажмите [E], чтобы спрятать или выкопать предмет.'},
+      {id:'s7', name:'Хладнокровная маскировка', desc:'Оглушение доской дает вам спринт.'},
       {id:'s8', name:'Одиночный расчет', desc:'Отличная проверка шире на 40%.'},
       {id:'s9', name:'Загнанный зверь', desc:'Ранен вне погони -> скорость ворот +20%.'}
     ];
@@ -460,17 +485,36 @@
         });
     }
 
+    // ==========================================
+    // 5. ИГРОВОЙ ПРОЦЕСС И ОТРИСОВКА
+    // ==========================================
     const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
     const player = { x: 0, y: 0, radius: 18, speed: 4.0, hp: 2, isRepairing: false, repairTarget: null, invTimer: 0, angle: Math.PI/2, item: null, charge: 0, vaulting: false, vaultProgress: 0, vaultStartX: 0, vaultStartY: 0, vaultEndX: 0, vaultEndY: 0, moving: false };
-    const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI };
+    const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI, dashTimer: 0 };
     const obstacles = [{ x: 400, y: 300, w: 120, h: 80 }, { x: 400, y: 460, w: 120, h: 60 }, { x: 800, y: 200, w: 250, h: 100 }, { x: 1200, y: 450, w: 100, h: 120 }, { x: 1200, y: 650, w: 100, h: 100 }, { x: 300, y: 800, w: 300, h: 90 }, { x: 850, y: 750, w: 180, h: 180 }, { x: 600, y: 1100, w: 100, h: 80 }, { x: 780, y: 1100, w: 170, h: 80 }];
     const windows = [ { x: 400, y: 380, w: 120, h: 80, vaultDir: 'LR' }, { x: 1200, y: 570, w: 100, h: 80, vaultDir: 'LR' }, { x: 700, y: 1100, w: 80, h: 80, vaultDir: 'UD' } ];
-    const allPalletSpawns = [{ x: 200, y: 350, w: 20, h: 120, cx: 210, cy: 410 }, { x: 700, y: 150, w: 100, h: 20, cx: 750, cy: 160 }, { x: 1050, y: 750, w: 20, h: 150, cx: 1060, cy: 825 }, { x: 600, y: 750, w: 150, h: 20, cx: 675, cy: 760 }];
+    
+    // Пул полностью безопасных позиций для паллет
+    const safePalletSpawns = [
+      { x: 200, y: 350, w: 20, h: 120, cx: 210, cy: 410 },
+      { x: 700, y: 150, w: 100, h: 20, cx: 750, cy: 160 },
+      { x: 1050, y: 750, w: 20, h: 150, cx: 1060, cy: 825 },
+      { x: 600, y: 750, w: 150, h: 20, cx: 675, cy: 760 },
+      { x: 200, y: 800, w: 20, h: 100, cx: 210, cy: 850 },
+      { x: 900, y: 400, w: 100, h: 20, cx: 950, cy: 410 },
+      { x: 1400, y: 300, w: 20, h: 100, cx: 1410, cy: 350 },
+      { x: 1500, y: 900, w: 100, h: 20, cx: 1550, cy: 910 },
+      { x: 400, y: 150, w: 20, h: 100, cx: 410, cy: 200 },
+      { x: 800, y: 1000, w: 120, h: 20, cx: 860, cy: 1010 },
+      { x: 1100, y: 150, w: 20, h: 120, cx: 1110, cy: 210 }
+    ];
+
     let generators = [], exitGate = {}, pallets = [], chests = [], fakeExplosions = [];
     const skillCheck = { active: false, angle: 0, speed: 0.05, sStart: 0, sEnd: 0, gStart: 0, gEnd: 0 };
     
     let gameState = 'LOBBY';
-    let pState = {}, abilityAction = null;
+    let pState = { hitSprintTimer: 0, slowTimer: 0, blindTimer: 0, s3_stillTime: 0, s3_hidden: 0, s2_repairTime: 0, s2_buff: false, k4_trTimer: 0, k5_chaseTime: 0, stash: null };
+    let abilityCd = 0;
     const MAP_WIDTH = 1800, MAP_HEIGHT = 1400;
     let camera = { x: 0, y: 0 };
     let aspectMode = 'native';
@@ -499,14 +543,16 @@
       if (skillCheck.active || player.vaulting) return;
       skillCheck.active = true; skillCheck.angle = 0; skillCheck.speed = 0.045 + Math.random() * 0.02;
       const start = 1.6 + Math.random() * 2.2; skillCheck.sStart = start; skillCheck.sEnd = start + 0.8;
-      skillCheck.gStart = skillCheck.sEnd - 0.2; skillCheck.gEnd = skillCheck.sEnd; playTone(850, 0.12, 'sine');
+      if (myRole === 'SURVIVOR' && pState.s2_buff) { skillCheck.sEnd = start + 0.6; pState.s2_buff = false; }
+      let gSize = 0.2; if (myRole === 'SURVIVOR' && myPerks.includes('s8')) gSize = 0.28;
+      skillCheck.gStart = skillCheck.sEnd - gSize; skillCheck.gEnd = skillCheck.sEnd; playTone(850, 0.12, 'sine');
     }
     
     function resolveSkillCheck() {
       if (!skillCheck.active) return;
       const ang = skillCheck.angle;
       if (ang >= skillCheck.gStart && ang <= skillCheck.gEnd) { 
-          if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + 6); 
+          if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + (myPerks.includes('s8')?9:6)); 
           playTone(1200, 0.15, 'sine'); 
       } else if (ang >= skillCheck.sStart && ang <= skillCheck.sEnd) { 
           if (player.repairTarget) player.repairTarget.progress = Math.min(100, player.repairTarget.progress + 2); 
@@ -519,6 +565,15 @@
           playTone(150, 0.4, 'sawtooth'); 
       }
       skillCheck.active = false;
+    }
+
+    function checkLOS(x1, y1, x2, y2) {
+      function ccw(A, B, C) { return (C.y-A.y)*(B.x-A.x) > (B.y-A.y)*(C.x-A.x); } function intersect(A, B, C, D) { return ccw(A,C,D) !== ccw(B,C,D) && ccw(A,B,C) !== ccw(A,B,D); }
+      let A = {x: x1, y: y1}, B = {x: x2, y: y2};
+      for (let ob of obstacles) {
+        let C1 = {x: ob.x, y: ob.y}, C2 = {x: ob.x+ob.w, y: ob.y}, C3 = {x: ob.x+ob.w, y: ob.y+ob.h}, C4 = {x: ob.x, y: ob.y+ob.h};
+        if (intersect(A,B,C1,C2) || intersect(A,B,C2,C3) || intersect(A,B,C3,C4) || intersect(A,B,C4,C1)) return false;
+      } return true;
     }
 
     function startMatch() {
@@ -535,18 +590,32 @@
           document.getElementById('hud-item-wrap').style.display = 'block';
       }
       
+      // Инициализация сида и кнопок абилок
+      let hasAbility = myRole === 'KILLER' || myPerks.includes('s6');
       document.getElementById('ability-hint').style.display = 'block';
+      document.getElementById('hint-e-text').style.display = hasAbility ? 'inline' : 'none';
       document.getElementById('hint-f-text').style.display = isTouchDevice ? 'none' : 'inline';
+      if (isTouchDevice) document.getElementById('mob-ability-btn').style.display = hasAbility ? 'flex' : 'none';
 
-      fakeExplosions = []; networkEvents = [];
-      pState = { hitSprintTimer: 0 };
+      fakeExplosions = []; networkEvents = []; decoys = []; resinZones = []; scratchMarks = []; abilityCd = 0;
+      pState = { hitSprintTimer: 0, slowTimer: 0, blindTimer: 0, s3_stillTime: 0, s3_hidden: 0, s2_repairTime: 0, s2_buff: false, k4_trTimer: 0, k5_chaseTime: 0, stash: null };
       
       player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0;
+      killer.x = 1400; killer.y = 1000; killer.state = 'SEARCH'; killer.faceAngle = Math.PI; killer.dashTimer = 0;
+      
+      if (myRole === 'SURVIVOR' && myCharData && myCharData.id === 's_vet') { player.item = 'toolbox'; player.charge = 100; }
+
+      // Рандомизация карты с помощью Seed
+      let pool = [...safePalletSpawns];
+      for (let i = pool.length - 1; i > 0; i--) { 
+          const j = Math.floor(seededRandom() * (i + 1)); 
+          [pool[i], pool[j]] = [pool[j], pool[i]]; 
+      }
+      pallets = pool.slice(0, 6).map(p => ({...p, state: 'up'}));
+
       generators = [ {x: 260, y: 550}, {x: 950, y: 350}, {x: 600, y: 950}, {x: 1450, y: 850} ].map(g => ({x: g.x, y: g.y, progress: 0, done: false}));
-      pallets = allPalletSpawns.map(p => ({...p, state: 'up'}));
       chests = [ { x: 100, y: 100, progress: 0, isOpen: false, done: false }, { x: 1700, y: 1300, progress: 0, isOpen: false, done: false } ];
       exitGate = { x: 1720, y: 650, w: 60, h: 120, progress: 0, isOpen: false };
-      killer.x = 1400; killer.y = 1000; killer.state = 'SEARCH'; killer.faceAngle = Math.PI;
     }
 
     function returnToLobby(text, color) { 
@@ -583,7 +652,11 @@
           for (let p of pallets) {
             if (p.state === 'up' && Math.hypot(player.x - p.cx, player.y - p.cy) < 70) {
                 p.state = 'dropped'; networkEvents.push({ type: 'palletDrop', id: pallets.indexOf(p) }); playTone(200, 0.2, 'square'); 
-                if (Math.hypot(killer.x - p.cx, killer.y - p.cy) < 95 && killer.state !== 'STUNNED') { killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth'); } return; 
+                if (Math.hypot(killer.x - p.cx, killer.y - p.cy) < 95 && killer.state !== 'STUNNED') { 
+                    killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth'); 
+                    if (myPerks.includes('s7')) pState.hitSprintTimer = 120;
+                    if (myPerks.includes('k7')) networkEvents.push({ type: 'perk_blind' });
+                } return; 
             }
           }
           for (let c of chests) { if (!c.isOpen && Math.hypot(player.x - c.x, player.y - c.y) < 75) { player.isRepairing = !player.isRepairing; player.repairTarget = player.isRepairing ? c : null; return; } }
@@ -592,9 +665,37 @@
       } else {
           if (killer.state === 'STUNNED' || killer.state === 'BREAKING') return;
           let broke = false;
-          for (let p of pallets) { if (p.state === 'dropped' && Math.hypot(killer.x - p.cx, killer.y - p.cy) < 80) { killer.state = 'BREAKING'; killer.timer = 90; killer.targetPallet = p; broke = true; break; } }
+          for (let p of pallets) { 
+              if (p.state === 'dropped' && Math.hypot(killer.x - p.cx, killer.y - p.cy) < 80) { 
+                  let brkSpeed = (myPerks.includes('k5') && pState.k5_chaseTime > 1500) ? 60 : 90;
+                  killer.state = 'BREAKING'; killer.timer = brkSpeed; killer.targetPallet = p; broke = true; break; 
+              } 
+          }
           if (!broke && killer.state !== 'ATTACK_WINDUP' && killer.state !== 'ATTACK_LUNGE' && killer.state !== 'ATTACK_CD') { killer.state = 'ATTACK_WINDUP'; killer.timer = 18; killer.angle = killer.faceAngle || 0; }
       }
+    }
+
+    function useAbility() {
+        if (gameState !== 'PLAYING') return;
+        if (myRole === 'KILLER' && abilityCd <= 0 && killer.state !== 'STUNNED') {
+            abilityCd = 600;
+            if (myCharData.id === 'k_ill') {
+                networkEvents.push({ type: 'ability_decoy', x: killer.x, y: killer.y });
+                decoys.push({x: killer.x, y: killer.y, timer: 600}); playTone(400, 0.3, 'sine');
+            } else if (myCharData.id === 'k_cyb') {
+                killer.dashTimer = 90; playTone(150, 0.5, 'sawtooth');
+            } else if (myCharData.id === 'k_ban') {
+                networkEvents.push({ type: 'ability_slow', x: killer.x, y: killer.y }); playTone(800, 0.6, 'square');
+            } else if (myCharData.id === 'k_pup') {
+                networkEvents.push({ type: 'ability_pull', x: killer.x, y: killer.y }); playTone(200, 0.4, 'triangle');
+            }
+        } else if (myRole === 'SURVIVOR' && myPerks.includes('s6')) {
+            if (player.item && !pState.stash) {
+                pState.stash = {x: player.x, y: player.y, item: player.item, charge: player.charge}; player.item = null; player.charge = 0;
+            } else if (!player.item && pState.stash && Math.hypot(player.x - pState.stash.x, player.y - pState.stash.y) < 50) {
+                player.item = pState.stash.item; player.charge = Math.min(100, pState.stash.charge + 30); pState.stash = null;
+            }
+        }
     }
 
     let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2, rightClickDown = false, keys = {};
@@ -608,7 +709,7 @@
         jz.addEventListener('touchmove', (e) => { e.preventDefault(); if (joyActive) updJoy(e.targetTouches[0].clientX, e.targetTouches[0].clientY); }, {passive: false});
         jz.addEventListener('touchend', (e) => { e.preventDefault(); joyActive = false; window.joyDelta = {x:0, y:0}; js.style.transform = `translate(-50%, -50%)`; });
         document.getElementById('mob-action-btn').addEventListener('touchstart', (e) => { e.preventDefault(); doAction(); });
-        document.getElementById('mob-ability-btn').addEventListener('touchstart', (e) => { e.preventDefault(); if (abilityAction) abilityAction(); });
+        document.getElementById('mob-ability-btn').addEventListener('touchstart', (e) => { e.preventDefault(); useAbility(); });
         
         function updJoy(tx, ty) {
             let dx = tx - joyOrigin.x, dy = ty - joyOrigin.y, dist = Math.hypot(dx, dy);
@@ -630,7 +731,7 @@
     window.addEventListener('keydown', e => { 
         keys[e.code] = true; 
         if (e.code === 'Space') doAction(); 
-        if (e.code === 'KeyE' && abilityAction) abilityAction(); 
+        if (e.code === 'KeyE') useAbility(); 
         if (e.code === 'KeyF' && gameState === 'PLAYING') {
             if (document.pointerLockElement === canvas) document.exitPointerLock(); 
             else canvas.requestPointerLock();
@@ -660,9 +761,7 @@
     function update() {
       if (gameState !== 'PLAYING') return;
 
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
-
+      const cx = canvas.width / 2; const cy = canvas.height / 2;
       let targetCamera = myRole === 'SURVIVOR' ? player : killer;
       camera.x = Math.max(0, Math.min(targetCamera.x - cx, MAP_WIDTH - canvas.width));
       camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
@@ -671,31 +770,75 @@
       if (isTouchDevice && myRole === 'KILLER') { if (window.joyDelta && Math.hypot(window.joyDelta.x, window.joyDelta.y) > 0.1) aimAngle = Math.atan2(window.joyDelta.y, window.joyDelta.x); else aimAngle = killer.faceAngle; } 
       else { let screenTargetX = targetCamera.x - camera.x, screenTargetY = targetCamera.y - camera.y; aimAngle = Math.atan2(mouseY - screenTargetY, mouseX - screenTargetX); }
 
+      // Таймеры перков и эффектов
       if(pState.hitSprintTimer > 0) pState.hitSprintTimer--;
+      if(pState.slowTimer > 0) pState.slowTimer--;
+      if(pState.blindTimer > 0) pState.blindTimer--;
+      if(pState.k4_trTimer > 0) pState.k4_trTimer--;
+      if(abilityCd > 0) abilityCd--;
+      if(killer.dashTimer > 0) killer.dashTimer--;
+      
       for (let i = fakeExplosions.length - 1; i >= 0; i--) { fakeExplosions[i].timer--; if (fakeExplosions[i].timer <= 0) fakeExplosions.splice(i, 1); }
+      for (let i = decoys.length - 1; i >= 0; i--) { decoys[i].timer--; if (decoys[i].timer <= 0) decoys.splice(i, 1); }
+      for (let i = resinZones.length - 1; i >= 0; i--) { resinZones[i].timer--; if (resinZones[i].timer <= 0) resinZones.splice(i, 1); }
 
+      // UI статусы
+      let sfx = [];
+      if (myRole === 'SURVIVOR') {
+          if (pState.hitSprintTimer > 0) sfx.push({n: 'Ускорение', c: '#3b82f6'});
+          if (pState.slowTimer > 0) sfx.push({n: 'Замедление', c: '#eab308'});
+          if (pState.blindTimer > 0) sfx.push({n: 'Ослепление', c: '#fcd34d'});
+          if (pState.s2_buff) sfx.push({n: 'Мастерство', c: '#eab308'});
+          if (pState.s3_hidden > 0) sfx.push({n: 'Слепое пятно', c: '#8b5cf6'});
+          if (generators.filter(g => !g.done).length === 0) sfx.push({n: 'Уязвимость', c: '#ef4444'});
+      } else {
+          if (pState.k5_chaseTime > 1500 || killer.dashTimer > 0) sfx.push({n: 'Жажда крови', c: '#ef4444'});
+          if (pState.k4_trTimer > 0) sfx.push({n: 'Незаметность', c: '#8b5cf6'});
+          if (abilityCd <= 0) document.getElementById('hint-e-text').style.color = '#4ade80'; else document.getElementById('hint-e-text').style.color = '#aaa';
+      }
+      document.getElementById('status-effects').innerHTML = sfx.map(e => `<div class="effect-badge" style="border-left-color: ${e.c}">${e.n}</div>`).join('');
+
+      // --- ЛОГИКА ВЫЖИВШЕГО ---
       if (myRole === 'SURVIVOR') {
           if (player.vaulting) {
-              player.moving = true; player.vaultProgress += 0.04; 
+              player.moving = true; let vStep = 0.04;
+              if (myCharData && myCharData.id === 's_acro') vStep *= 1.3;
+              if (myPerks.includes('s1') && pState.hitSprintTimer > 0) vStep *= 1.1;
+              let inResin = false; for(let rz of resinZones) if(Math.hypot(player.x - rz.x, player.y - rz.y) < 160) inResin = true;
+              if (inResin) vStep *= 0.8;
+              
+              player.vaultProgress += vStep; 
               if (player.vaultProgress >= 1) { player.vaulting = false; player.x = player.vaultEndX; player.y = player.vaultEndY; } 
               else { player.x = player.vaultStartX + (player.vaultEndX - player.vaultStartX) * player.vaultProgress; player.y = player.vaultStartY + (player.vaultEndY - player.vaultStartY) * player.vaultProgress; }
           } else {
-              player.moving = false; let currentSpeed = pState.hitSprintTimer > 0 ? 6.0 : player.speed;
+              player.moving = false; 
+              let currentSpeed = pState.hitSprintTimer > 0 ? (myPerks.includes('s4') ? 6.5 : 6.0) : player.speed;
+              if (myPerks.includes('s9') && player.hp === 1) currentSpeed *= 1.1;
+              if (pState.slowTimer > 0) currentSpeed *= 0.6;
+              
               let mx = 0, my = 0;
               if (isTouchDevice && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
               else { if (keys['KeyW'] || keys['ArrowUp']) my -= 1; if (keys['KeyS'] || keys['ArrowDown']) my += 1; if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1; if (keys['KeyD'] || keys['ArrowRight']) mx += 1; }
               const len = Math.hypot(mx, my);
               if (len > 0.05) {
-                  player.moving = true; player.isRepairing = false; player.repairTarget = null;
+                  player.moving = true; player.isRepairing = false; player.repairTarget = null; pState.s3_stillTime = 0;
                   const nx = player.x + (mx / (len>1?len:1)) * currentSpeed, ny = player.y + (my / (len>1?len:1)) * currentSpeed;
                   if (!checkWall(nx, player.y, player.radius, false)) player.x = nx;
                   if (!checkWall(player.x, ny, player.radius, false)) player.y = ny;
+              } else {
+                  if (myPerks.includes('s3') && Math.hypot(player.x - killer.x, player.y - killer.y) < 450) {
+                      pState.s3_stillTime++; if(pState.s3_stillTime >= 240) { pState.s3_hidden = 480; pState.s3_stillTime = 0; }
+                  }
               }
+              if (pState.s3_hidden > 0) pState.s3_hidden--;
               if (player.invTimer > 0) player.invTimer--;
 
               if (player.isRepairing && player.repairTarget) {
+                  if (myPerks.includes('s2')) { pState.s2_repairTime++; if (pState.s2_repairTime > 1800) { pState.s2_buff = true; pState.s2_repairTime = 0; } }
+                  
                   if (player.repairTarget === exitGate) {
-                      exitGate.progress += 0.25; networkEvents.push({ type: 'exitUpdate', progress: exitGate.progress });
+                      exitGate.progress += (myPerks.includes('s9') && player.hp === 1) ? 0.3 : 0.25; 
+                      networkEvents.push({ type: 'exitUpdate', progress: exitGate.progress });
                       if (exitGate.progress >= 100) { exitGate.isOpen = true; player.isRepairing = false; }
                   } 
                   else if (chests.includes(player.repairTarget)) {
@@ -710,19 +853,37 @@
                       if (player.repairTarget.progress >= 100) { player.repairTarget.done = true; player.isRepairing = false; playTone(880, 0.3, 'sine'); player.repairTarget = null; } 
                       else if (!skillCheck.active && Math.random() < 0.009) triggerSkillCheck();
                   }
-              }
+              } else { pState.s2_repairTime = 0; }
+
               if (exitGate.isOpen && player.x > exitGate.x + 25) { 
                   if (socket && isMultiplayer) socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, events: [{type: 'escaped'}] });
                   let reward = unlockRandomReward('SURVIVOR');
                   returnToLobby(`ВЫЖИВШИЙ СБЕЖАЛ\n\n${reward}`, '#4ade80'); 
               }
           }
-          if (socket && isMultiplayer) { socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, state: 'run', events: networkEvents }); networkEvents = []; }
+          if (socket && isMultiplayer) { 
+              if (pState.s3_hidden <= 0) { // Перк Слепое пятно: скрывает координаты
+                  socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, state: 'run', events: networkEvents }); 
+              } else {
+                  socket.emit('updatePosition', { x: -1000, y: -1000, hp: player.hp, state: 'run', events: networkEvents }); 
+              }
+              networkEvents = []; 
+          }
       } 
+      // --- ЛОГИКА МАНЬЯКА ---
       else if (myRole === 'KILLER') {
+          let wasChasing = false;
+          
           if (killer.state === 'STUNNED') { killer.timer--; if (killer.timer <= 0) killer.state = 'SEARCH'; } 
           else if (killer.state === 'BREAKING') {
-              killer.timer--; if (killer.timer <= 0) { if(killer.targetPallet) { killer.targetPallet.state = 'broken'; networkEvents.push({ type: 'palletBreak', id: pallets.indexOf(killer.targetPallet) }); playTone(150, 0.3, 'square'); killer.state = 'SEARCH'; } }
+              killer.timer--; if (killer.timer <= 0) { 
+                  if(killer.targetPallet) { 
+                      killer.targetPallet.state = 'broken'; networkEvents.push({ type: 'palletBreak', id: pallets.indexOf(killer.targetPallet) }); 
+                      if(myPerks.includes('k1')) { networkEvents.push({ type: 'perk_resin', x: killer.x, y: killer.y }); resinZones.push({x: killer.x, y: killer.y, timer: 1200}); }
+                      if(myPerks.includes('k4')) pState.k4_trTimer = 900;
+                      playTone(150, 0.3, 'square'); killer.state = 'SEARCH'; 
+                  } 
+              }
           }
           else if (killer.state === 'ATTACK_WINDUP') {
               killer.timer--; if (killer.timer <= 0) { killer.state = 'ATTACK_LUNGE'; killer.timer = 12; killer.vx = Math.cos(killer.faceAngle) * killer.speed * 1.8; killer.vy = Math.sin(killer.faceAngle) * killer.speed * 1.8; }
@@ -733,17 +894,24 @@
               if (!checkWall(killer.x, killer.y + killer.vy, killer.radius, true, false)) killer.y += killer.vy;
               
               let targets = isMultiplayer ? Object.entries(otherSurvivors).map(([id, s]) => ({id, ...s})) : [{id: 'local', ...player}];
-              
+              let instaDown = myPerks.includes('k9') && generators.filter(g=>!g.done).length === 0;
+
               for (let s of targets) {
                   let dist = Math.hypot(s.x - killer.x, s.y - killer.y), angleToPlayer = Math.atan2(s.y - killer.y, s.x - killer.x), angleDiff = Math.abs(angleToPlayer - killer.faceAngle);
                   if (angleDiff > Math.PI) angleDiff = 2*Math.PI - angleDiff;
 
                   if (dist < ((s.radius||18) + killer.radius + 35) && angleDiff < Math.PI/3 && s.hp > 0) {
                       playTone(110, 0.35, 'sawtooth'); killer.state = 'ATTACK_CD'; killer.timer = 80;
+                      if (myPerks.includes('k10')) networkEvents.push({ type: 'perk_ruin' });
+                      
                       if (!isMultiplayer) { 
-                          if (player.invTimer === 0 && player.hp > 0) { player.hp -= 1; pState.hitSprintTimer = 120; player.invTimer = 90; if (player.hp <= 0) { let reward = unlockRandomReward('KILLER'); returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80'); } } 
+                          if (player.invTimer === 0 && player.hp > 0) { 
+                              player.hp -= instaDown ? 2 : 1; pState.hitSprintTimer = 120; player.invTimer = 90; 
+                              if (player.hp <= 0) { let reward = unlockRandomReward('KILLER'); returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80'); } 
+                          } 
                       } else { 
                           socket.emit('hitPlayer', s.id); 
+                          if (instaDown) socket.emit('hitPlayer', s.id); // Double hit for insta-down
                       }
                       break; 
                   }
@@ -756,8 +924,17 @@
               if (isTouchDevice && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
               else { if (keys['KeyW'] || keys['ArrowUp']) my -= 1; if (keys['KeyS'] || keys['ArrowDown']) my += 1; if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1; if (keys['KeyD'] || keys['ArrowRight']) mx += 1; }
               const len = Math.hypot(mx, my);
-              if (len > 0.05) { const nx = killer.x + (mx / (len>1?len:1)) * killer.speed, ny = killer.y + (my / (len>1?len:1)) * killer.speed; if (!checkWall(nx, killer.y, killer.radius, true, false)) killer.x = nx; if (!checkWall(killer.x, ny, killer.radius, true, false)) killer.y = ny; }
+              let currentSpeed = killer.speed;
+              if (killer.dashTimer > 0) currentSpeed *= 1.8;
+              
+              if (len > 0.05) { const nx = killer.x + (mx / (len>1?len:1)) * currentSpeed, ny = killer.y + (my / (len>1?len:1)) * currentSpeed; if (!checkWall(nx, killer.y, killer.radius, true, false)) killer.x = nx; if (!checkWall(killer.x, ny, killer.radius, true, false)) killer.y = ny; }
               killer.faceAngle = aimAngle;
+
+              // Chase checking logic
+              let isChasing = false;
+              let targets = isMultiplayer ? Object.values(otherSurvivors) : [player];
+              for(let s of targets) { if(Math.hypot(s.x - killer.x, s.y - killer.y) < 450 && checkLOS(killer.x, killer.y, s.x, s.y)) isChasing = true; }
+              if (isChasing) { pState.k5_chaseTime++; wasChasing = true; } else { pState.k5_chaseTime = 0; }
           }
           if (socket && isMultiplayer) { socket.emit('updatePosition', { x: killer.x, y: killer.y, angle: killer.faceAngle, state: killer.state, events: networkEvents }); networkEvents = []; }
       }
@@ -790,17 +967,21 @@
     function render() {
       if (gameState !== 'PLAYING') return;
       ctx.clearRect(0, 0, canvas.width, canvas.height); 
-      
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
+      const cx = canvas.width / 2, cy = canvas.height / 2;
       
       let targetCamera = myRole === 'SURVIVOR' ? player : killer;
+      camera.x = Math.max(0, Math.min(targetCamera.x - cx, MAP_WIDTH - canvas.width)); 
+      camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
       
       ctx.save(); ctx.translate(-camera.x, -camera.y);
 
+      // Фон и сетка
       ctx.fillStyle = "#141714"; ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT); ctx.strokeStyle = "#1f241f"; ctx.lineWidth = 2;
       for (let x = 0; x < MAP_WIDTH; x+=100) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,MAP_HEIGHT); ctx.stroke(); }
       for (let y = 0; y < MAP_HEIGHT; y+=100) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(MAP_WIDTH,y); ctx.stroke(); }
+
+      // Лужи смолы (Перк k1)
+      for (let r of resinZones) { ctx.beginPath(); ctx.arc(r.x, r.y, 160, 0, Math.PI*2); ctx.fillStyle = "rgba(100, 255, 100, 0.1)"; ctx.fill(); }
 
       ctx.fillStyle = "#2c332d"; ctx.strokeStyle = "#404c42"; ctx.lineWidth = 3;
       obstacles.forEach(o => { ctx.fillRect(o.x, o.y, o.w, o.h); ctx.strokeRect(o.x, o.y, o.w, o.h); });
@@ -824,6 +1005,16 @@
         ctx.fillStyle = g.done ? "#22c55e" : "#eab308"; ctx.fillRect(g.x-22, g.y-22, 44, 44); ctx.strokeStyle = "#fff"; ctx.strokeRect(g.x-22, g.y-22, 44, 44);
         if (!g.done && g.progress > 0) { ctx.fillStyle = "#3b82f6"; ctx.fillRect(g.x-30, g.y-35, (g.progress/100)*60, 8); }
       });
+
+      // Тайник (Перк s6)
+      if (pState.stash && myRole === 'SURVIVOR') {
+          ctx.beginPath(); ctx.arc(pState.stash.x, pState.stash.y, 10, 0, Math.PI*2); ctx.fillStyle = "#fff"; ctx.fill();
+      }
+
+      // Декои маньяка (Иллюзионист)
+      for (let d of decoys) {
+          ctx.beginPath(); ctx.arc(d.x, d.y, killer.radius, 0, Math.PI*2); ctx.fillStyle = "#991b1b"; ctx.fill(); ctx.stroke();
+      }
       
       for (let f of fakeExplosions) {
           ctx.beginPath();
@@ -848,7 +1039,7 @@
 
       for (let sId in otherSurvivors) {
           let s = otherSurvivors[sId];
-          if (s.hp > 0) { 
+          if (s.hp > 0 && s.x > 0) { 
               let sColor = s.hp === 1 ? "#ef4444" : "#3b82f6";
               renderAvatar({x: s.x, y: s.y, radius: 18}, sColor, s.avatarImg, s.user ? s.user.name : "Выживший"); 
           }
@@ -859,24 +1050,26 @@
           renderAvatar(player, pColor, myAvatarImg, currentUser.name);
       }
 
-      let kColor = killer.state === 'STUNNED' ? "#f59e0b" : (myRole === 'KILLER' ? (myCharData ? myCharData.color : '#991b1b') : '#991b1b');
-      let kName = (myRole === 'KILLER') ? currentUser.name : (killer.user ? killer.user.name : "Маньяк");
-      let kAvatar = (myRole === 'KILLER') ? myAvatarImg : killer.avatarImg;
-      renderAvatar(killer, kColor, kAvatar, kName);
-      
-      if (killer.state !== 'STUNNED' && killer.state !== 'BREAKING') {
-          const ang = killer.faceAngle; ctx.beginPath(); ctx.moveTo(killer.x, killer.y); 
-          if (killer.state === 'ATTACK_WINDUP' || killer.state === 'ATTACK_LUNGE') { ctx.arc(killer.x, killer.y, 140, ang-0.2, ang+0.2); ctx.fillStyle = "rgba(255, 0, 0, 0.5)"; } 
-          else { ctx.arc(killer.x, killer.y, 110, ang-0.45, ang+0.45); ctx.fillStyle = "rgba(255, 0, 0, 0.25)";  } ctx.fill();
+      let drawKiller = true;
+      if (myRole === 'SURVIVOR' && pState.k4_trTimer > 0) drawKiller = false; // Перк Незаметность
+      if (drawKiller) {
+          let kColor = killer.state === 'STUNNED' ? "#f59e0b" : (myRole === 'KILLER' ? (myCharData ? myCharData.color : '#991b1b') : '#991b1b');
+          let kName = (myRole === 'KILLER') ? currentUser.name : (killer.user ? killer.user.name : "Маньяк");
+          let kAvatar = (myRole === 'KILLER') ? myAvatarImg : killer.avatarImg;
+          renderAvatar(killer, kColor, kAvatar, kName);
+          
+          if (killer.state !== 'STUNNED' && killer.state !== 'BREAKING') {
+              const ang = killer.faceAngle; ctx.beginPath(); ctx.moveTo(killer.x, killer.y); 
+              if (killer.state === 'ATTACK_WINDUP' || killer.state === 'ATTACK_LUNGE') { ctx.arc(killer.x, killer.y, 140, ang-0.2, ang+0.2); ctx.fillStyle = "rgba(255, 0, 0, 0.5)"; } 
+              else { ctx.arc(killer.x, killer.y, 110, ang-0.45, ang+0.45); ctx.fillStyle = "rgba(255, 0, 0, 0.25)";  } ctx.fill();
+          }
       }
       ctx.restore();
 
-      // Отрисовка белого кастомного курсора (всегда рисуем на ПК)
-      if (!isTouchDevice) { 
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; 
-          ctx.beginPath(); 
-          ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); 
-          ctx.fill(); 
+      if (myRole === 'SURVIVOR' && pState.blindTimer > 0) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+
+      if (!isTouchDevice && document.pointerLockElement !== canvas) { 
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.beginPath(); ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); ctx.fill(); 
       }
 
       if (myRole === 'SURVIVOR' && skillCheck.active) {
