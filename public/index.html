@@ -46,10 +46,16 @@
     }
     .user-card-preview {
       display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
-      background: #111; padding: 10px 15px; border-radius: 8px; border: 1px solid #444;
+      background: #111; padding: 10px 15px; border-radius: 8px; border: 1px solid #444; position: relative;
     }
     .user-card-preview img { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; }
     
+    .logout-btn {
+      position: absolute; right: 15px; background: #ff4444; border: none; color: #fff; 
+      padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s;
+    }
+    .logout-btn:hover { background: #cc0000; }
+
     #char-menu, #perk-menu, #matchmaking-screen { display: none; padding: 20px; box-sizing: border-box; }
     #char-list { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; max-width: 800px; }
     
@@ -80,7 +86,7 @@
     #hud { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0, 0, 0, 0.8); padding: 10px 20px; border-radius: 12px; border: 1px solid #444; font-size: 14px; font-weight: bold; }
     #hud span { color: #ff4444; }
     #hud-item { color: #60a5fa !important; }
-    #ability-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: bold; color: #e1bee7; text-shadow: 1px 1px 2px #000; display: none; }
+    #ability-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; font-size: 18px; font-weight: bold; color: #e1bee7; text-shadow: 1px 1px 2px #000; }
     
     #status-effects { position: absolute; right: 20px; top: 70px; display: flex; flex-direction: column; gap: 8px; z-index: 150; }
     .effect-badge { background: rgba(20, 20, 20, 0.85); border-left: 4px solid #fff; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.5); text-transform: uppercase; }
@@ -115,7 +121,6 @@
         <h2 style="margin-top:0; color:#ff4444;">ВХОД В ИГРУ</h2>
         <p style="font-size:14px; color:#bbb; margin-bottom: 20px;">Авторизуйтесь через Telegram, чтобы получить аватарку и сохранять свой прогресс</p>
         
-        <!-- Контейнер официального виджета Telegram Login Widget -->
         <div id="telegram-widget-container" style="display:flex; justify-content:center; margin-bottom:15px;"></div>
         
         <div style="margin: 15px 0; color:#666; font-size:12px;">— ИЛИ —</div>
@@ -126,12 +131,13 @@
     <!-- Главное меню -->
     <div id="main-menu" class="screen" style="display:none;">
       <h1>DEAD BY DAYLIGHT</h1>
-      <div id="user-profile-bar" class="user-card-preview">
+      <div id="user-profile-bar" class="user-card-preview" style="width: 350px;">
         <img id="user-avatar-preview" src="" alt="" style="display:none;">
         <div style="text-align:left;">
           <div style="font-size:11px; color:#888;">ВЫ ВОШЛИ КАК:</div>
           <div id="user-name-preview" style="font-weight:bold; color:#4ade80; font-size:16px;"></div>
         </div>
+        <button class="logout-btn" onclick="logoutUser()">ВЫЙТИ</button>
       </div>
 
       <div class="menu-btns">
@@ -173,7 +179,10 @@
         <div>ПРЕДМЕТ: <span id="hud-item">НЕТ</span></div>
       </div>
       <div id="status-effects"></div>
-      <div id="ability-hint">[E] / НАВЫК</div>
+      <div id="ability-hint" style="display: none;">
+        <span id="hint-e-text">[E] / НАВЫК</span><br>
+        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть курсор</span>
+      </div>
       
       <div id="mobile-controls">
         <div id="joystick-zone"><div id="joystick-stick"></div></div>
@@ -185,17 +194,15 @@
 
   <script>
     // ==========================================
-    // 1. АВТОРИЗАЦИЯ И ДАННЫЕ TELEGRAM
+    // 1. АВТОРИЗАЦИЯ И ДАННЫЕ
     // ==========================================
-    // Вставь username твоего бота БЕЗ @ (например: dbd_game_bot)
-    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot";
+    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot"; // <-- Замени на своего бота без @
 
     let currentUser = { id: null, name: "Гость", photo: null };
     let myAvatarImg = null;
     let enemyUser = { name: "Оппонент", photo: null };
     let enemyAvatarImg = null;
 
-    // Callback, вызываемый виджетом Telegram после подтверждения
     window.onTelegramAuth = async function(user) {
         try {
             const resp = await fetch('/api/auth/telegram', {
@@ -204,18 +211,10 @@
                 body: JSON.stringify(user)
             });
             const data = await resp.json();
-            if (data.success) {
-                applyUser(data.user);
-            } else {
-                alert('Ошибка авторизации Telegram: ' + (data.error || 'Неизвестная ошибка'));
-            }
+            if (data.success) { applyUser(data.user); } 
+            else { alert('Ошибка авторизации: ' + (data.error || 'Неизвестная ошибка')); }
         } catch (e) {
-            // При локальном запуске без бэкенда
-            applyUser({
-                id: user.id,
-                name: user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-                photo: user.photo_url || null
-            });
+            applyUser({ id: user.id, name: user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim(), photo: user.photo_url || null });
         }
     };
 
@@ -227,20 +226,12 @@
             myAvatarImg.crossOrigin = "Anonymous";
             myAvatarImg.src = currentUser.photo;
         }
-
-        // Обновляем плашку в меню
         document.getElementById('user-name-preview').innerText = currentUser.name;
         const imgEl = document.getElementById('user-avatar-preview');
-        if (currentUser.photo) {
-            imgEl.src = currentUser.photo;
-            imgEl.style.display = 'block';
-        } else {
-            imgEl.style.display = 'none';
-        }
-
+        if (currentUser.photo) { imgEl.src = currentUser.photo; imgEl.style.display = 'block'; } 
+        else { imgEl.style.display = 'none'; }
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-menu').style.display = 'flex';
-
         if (socket) socket.emit('setUserData', currentUser);
     }
 
@@ -249,49 +240,44 @@
         applyUser({ id: guestId, name: `Гость_${guestId}`, photo: null });
     }
 
-    // Инициализация при старте
+    function logoutUser() {
+        localStorage.removeItem('dbd_saved_user');
+        location.reload(); // Перезагружаем страницу для очистки сессии
+    }
+
     function initAuth() {
-        // 1. Проверяем, запущено ли внутри Telegram WebApp (Mini App)
         if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
             const u = Telegram.WebApp.initDataUnsafe.user;
             Telegram.WebApp.expand();
-            applyUser({
-                id: u.id,
-                name: u.username || `${u.first_name || ''} ${u.last_name || ''}`.trim(),
-                photo: u.photo_url || null
-            });
+            applyUser({ id: u.id, name: u.username || `${u.first_name || ''} ${u.last_name || ''}`.trim(), photo: u.photo_url || null });
             return;
         }
-
-        // 2. Проверяем сохраненную сессию
         const saved = localStorage.getItem('dbd_saved_user');
-        if (saved) {
-            try {
-                applyUser(JSON.parse(saved));
-                return;
-            } catch(e){}
-        }
-
-        // 3. Добавляем официальный виджет Telegram Login
+        if (saved) { try { applyUser(JSON.parse(saved)); return; } catch(e){} }
+        
         const container = document.getElementById('telegram-widget-container');
         const script = document.createElement('script');
-        script.async = true;
-        script.src = "https://telegram.org/js/telegram-widget.js?22";
+        script.async = true; script.src = "https://telegram.org/js/telegram-widget.js?22";
         script.setAttribute('data-telegram-login', TELEGRAM_BOT_USERNAME);
-        script.setAttribute('data-size', 'large');
-        script.setAttribute('data-radius', '8');
-        script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-        script.setAttribute('data-request-access', 'write');
+        script.setAttribute('data-size', 'large'); script.setAttribute('data-radius', '8');
+        script.setAttribute('data-onauth', 'onTelegramAuth(user)'); script.setAttribute('data-request-access', 'write');
         container.appendChild(script);
     }
 
     // ==========================================
-    // 2. ПРОГРЕССИЯ И СОХРАНЕНИЯ
+    // 2. ПРОГРЕССИЯ
     // ==========================================
-    let progress = { chars: ['s_hack', 'k_ill'], perks: ['s1', 'k1'] };
+    let progress = { chars: ['s_base', 'k_ill'], perks: ['s1', 'k1'] };
+    
     function loadProgress() {
         let saved = localStorage.getItem('dbdProgress');
-        if (saved) { try { progress = JSON.parse(saved); } catch(e){} }
+        if (saved) { 
+            try { 
+                progress = JSON.parse(saved); 
+                // Ретроактивно выдаем нового базового перса, если у игрока старое сохранение
+                if (!progress.chars.includes('s_base')) progress.chars.push('s_base');
+            } catch(e){} 
+        }
     }
     function saveProgress() { localStorage.setItem('dbdProgress', JSON.stringify(progress)); }
     loadProgress();
@@ -302,7 +288,6 @@
         let availablePerks = (isSurvivor ? sPerks : kPerks).map(p => p.id).filter(id => !progress.perks.includes(id));
         
         if (availableChars.length === 0 && availablePerks.length === 0) return "ВСЕ НАГРАДЫ УЖЕ РАЗБЛОКИРОВАНЫ!";
-
         let rewardMsg = "";
         if (availableChars.length > 0 && (Math.random() < 0.3 || availablePerks.length === 0)) {
             let unlock = availableChars[Math.floor(Math.random() * availableChars.length)];
@@ -315,8 +300,7 @@
             let name = (isSurvivor ? sPerks : kPerks).find(p=>p.id===unlock).name;
             rewardMsg = `НОВЫЙ ПЕРК: ${name}`;
         }
-        saveProgress();
-        return rewardMsg;
+        saveProgress(); return rewardMsg;
     }
 
     // ==========================================
@@ -343,13 +327,8 @@
 
         socket.on('enemyPosition', (data) => {
             if (gameState !== 'PLAYING') return;
-
-            if (myRole === 'SURVIVOR') {
-                killer.x = data.x; killer.y = data.y; killer.faceAngle = data.angle; killer.state = data.state;
-            } else {
-                player.x = data.x; player.y = data.y;
-                if (data.hp !== undefined) player.hp = data.hp;
-            }
+            if (myRole === 'SURVIVOR') { killer.x = data.x; killer.y = data.y; killer.faceAngle = data.angle; killer.state = data.state; } 
+            else { player.x = data.x; player.y = data.y; if (data.hp !== undefined) player.hp = data.hp; }
 
             if (data.events && data.events.length > 0) {
                 for (let e of data.events) {
@@ -370,43 +349,29 @@
                             }
                         }
                     }
-                    if (myRole === 'KILLER' && e.type === 'dead') {
-                        let reward = unlockRandomReward('KILLER');
-                        returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80');
-                    }
-                    if (myRole === 'KILLER' && e.type === 'escaped') {
-                        returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444');
-                    }
+                    if (myRole === 'KILLER' && e.type === 'dead') { let reward = unlockRandomReward('KILLER'); returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80'); }
+                    if (myRole === 'KILLER' && e.type === 'escaped') { returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444'); }
                 }
             }
         });
 
-        socket.on('enemyDisconnected', () => {
-            if (gameState === 'PLAYING') returnToLobby('ОППОНЕНТ ОТКЛЮЧИЛСЯ', '#ffaa00');
-        });
+        socket.on('enemyDisconnected', () => { if (gameState === 'PLAYING') returnToLobby('ОППОНЕНТ ОТКЛЮЧИЛСЯ', '#ffaa00'); });
     }
 
     function joinQueue() {
         document.getElementById('perk-menu').style.display = 'none';
         document.getElementById('matchmaking-screen').style.display = 'flex';
-        if (socket) {
-            socket.emit('setUserData', currentUser);
-            socket.emit('findMatch', myRole);
-        } else {
-            console.warn("Socket.io недоступен, запустите локальный тест.");
-        }
+        if (socket) { socket.emit('setUserData', currentUser); socket.emit('findMatch', myRole); } 
+        else { console.warn("Socket.io недоступен, запустите локальный тест."); }
     }
 
-    function forceStartMatch() {
-        document.getElementById('matchmaking-screen').style.display = 'none';
-        isMultiplayer = false;
-        startMatch();
-    }
+    function forceStartMatch() { document.getElementById('matchmaking-screen').style.display = 'none'; isMultiplayer = false; startMatch(); }
 
     // ==========================================
     // 4. ДАННЫЕ ПЕРСОНАЖЕЙ И ПЕРКОВ
     // ==========================================
     const survivorsData = [
+      { id: 's_base', name: 'Новичок', color: '#94a3b8', desc: 'Без особых способностей' },
       { id: 's_hack', name: 'Хакер', color: '#22c55e', desc: 'Починка быстрее на 15%' },
       { id: 's_acro', name: 'Акробатка', color: '#ec4899', desc: 'Прыжки быстрее на 30%' },
       { id: 's_vet', name: 'Ветеран', color: '#1d4ed8', desc: 'Начинает с инструментами' },
@@ -457,9 +422,7 @@
                              <div class="char-name">${c.name}</div>
                              <div class="char-ability">${c.desc}</div>
                              ${!isUnlocked ? '<div class="locked-badge">ЗАКРЫТО</div>' : ''}`;
-            if (isUnlocked) {
-                div.onclick = () => { myCharData = c; openPerks(); };
-            }
+            if (isUnlocked) div.onclick = () => { myCharData = c; openPerks(); };
             listDiv.appendChild(div);
         });
     }
@@ -478,13 +441,8 @@
             div.innerHTML = `<div class="perk-name">${p.name} ${!isUnlocked ? '🔒' : ''}</div><div class="perk-desc">${p.desc}</div>`;
             if (isUnlocked) {
                 div.onclick = () => {
-                    if (myPerks.includes(p.id)) {
-                        myPerks = myPerks.filter(id => id !== p.id);
-                        div.classList.remove('selected');
-                    } else if (myPerks.length < 4) {
-                        myPerks.push(p.id);
-                        div.classList.add('selected');
-                    }
+                    if (myPerks.includes(p.id)) { myPerks = myPerks.filter(id => id !== p.id); div.classList.remove('selected'); } 
+                    else if (myPerks.length < 4) { myPerks.push(p.id); div.classList.add('selected'); }
                     document.getElementById('perk-menu-title').innerText = `ВЫБЕРИТЕ ПЕРКИ (${myPerks.length}/4)`;
                 };
             }
@@ -560,10 +518,12 @@
       initAudio();
       gameState = 'PLAYING';
       document.getElementById('game-ui').style.display = 'block';
+      document.getElementById('ability-hint').style.display = 'block';
       fakeExplosions = []; networkEvents = [];
       pState = { hitSprintTimer: 0 };
       
       document.getElementById('hud-gens').style.display = myRole === 'KILLER' ? 'none' : 'block';
+      document.getElementById('hint-f-text').style.display = isTouchDevice ? 'none' : 'inline';
 
       player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0;
       generators = [ {x: 260, y: 550}, {x: 950, y: 350}, {x: 600, y: 950}, {x: 1450, y: 850} ].map(g => ({x: g.x, y: g.y, progress: 0, done: false}));
@@ -643,7 +603,15 @@
     document.addEventListener('mousemove', (e) => { if (!isTouchDevice && document.pointerLockElement === canvas) { mouseX += e.movementX; mouseY += e.movementY; mouseX = Math.max(0, Math.min(canvas.width, mouseX)); mouseY = Math.max(0, Math.min(canvas.height, mouseY)); } else if (!isTouchDevice) { mouseX = e.clientX; mouseY = e.clientY; } });
     canvas.addEventListener('mousedown', (e) => { if (gameState !== 'PLAYING' || isTouchDevice) return; if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true; });
     window.addEventListener('mouseup', (e) => { if (e.button === 2) rightClickDown = false; });
-    window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Space') doAction(); if (e.code === 'KeyE' && abilityAction) abilityAction(); }); 
+    window.addEventListener('keydown', e => { 
+        keys[e.code] = true; 
+        if (e.code === 'Space') doAction(); 
+        if (e.code === 'KeyE' && abilityAction) abilityAction(); 
+        if (e.code === 'KeyF' && gameState === 'PLAYING') {
+            if (document.pointerLockElement === canvas) document.exitPointerLock(); 
+            else canvas.requestPointerLock();
+        }
+    }); 
     window.addEventListener('keyup', e => keys[e.code] = false);
 
     function checkWall(x, y, r, isKiller = false) {
@@ -710,7 +678,8 @@
                           player.item = ['flashlight', 'toolbox', 'medkit'][Math.floor(Math.random() * 3)]; player.charge = 100; playTone(600, 0.2, 'sine'); player.repairTarget = null;
                       }
                   } else {
-                      player.repairTarget.progress += 0.16; networkEvents.push({ type: 'genUpdate', id: generators.indexOf(player.repairTarget), progress: player.repairTarget.progress });
+                      let repSpd = (myCharData && myCharData.id === 's_hack') ? 0.18 : 0.16;
+                      player.repairTarget.progress += repSpd; networkEvents.push({ type: 'genUpdate', id: generators.indexOf(player.repairTarget), progress: player.repairTarget.progress });
                       if (player.repairTarget.progress >= 100) { player.repairTarget.done = true; player.isRepairing = false; playTone(880, 0.3, 'sine'); player.repairTarget = null; } 
                       else if (!skillCheck.active && Math.random() < 0.009) triggerSkillCheck();
                   }
@@ -842,15 +811,13 @@
           }
       }
 
-      // Отрисовка Выжившего
       if (player.invTimer % 6 < 3) {
-          let pColor = player.hp === 1 ? "#ef4444" : (myCharData ? myCharData.color : '#3b82f6');
+          let pColor = player.hp === 1 ? "#ef4444" : (myCharData ? myCharData.color : '#94a3b8');
           let pName = (myRole === 'SURVIVOR') ? currentUser.name : enemyUser.name;
           let pAvatar = (myRole === 'SURVIVOR') ? myAvatarImg : enemyAvatarImg;
           renderAvatar(player, pColor, pAvatar, pName);
       }
 
-      // Отрисовка Маньяка
       let kColor = killer.state === 'STUNNED' ? "#f59e0b" : (myCharData ? myCharData.color : '#991b1b');
       let kName = (myRole === 'KILLER') ? currentUser.name : enemyUser.name;
       let kAvatar = (myRole === 'KILLER') ? myAvatarImg : enemyAvatarImg;
@@ -863,7 +830,9 @@
       }
       ctx.restore();
 
-      if (!isTouchDevice) { ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.beginPath(); ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); ctx.fill(); }
+      if (!isTouchDevice && document.pointerLockElement !== canvas) { 
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.beginPath(); ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); ctx.fill(); 
+      }
 
       if (myRole === 'SURVIVOR' && skillCheck.active) {
         ctx.beginPath(); ctx.arc(cx, cy, 65, 0, Math.PI*2); ctx.strokeStyle="rgba(255,255,255,0.3)"; ctx.lineWidth=14; ctx.stroke();
@@ -874,7 +843,6 @@
     }
     function loop() { update(); render(); requestAnimationFrame(loop); } requestAnimationFrame(loop);
 
-    // Запуск проверки авторизации
     initAuth();
   </script>
 </body>
