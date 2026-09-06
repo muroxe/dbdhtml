@@ -72,7 +72,7 @@
     .char-ability { font-size: 12px; color: #ccc; }
 
     #perk-menu h2 { color: #fff; margin-bottom: 10px; }
-    #perk-list { flex: 1; width: 100%; max-width: 600px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-right: 10px; }
+    #perk-list { flex: 1; width: 100%; max-width: 600px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 10px; }
     .perk-item { background: rgba(40, 40, 40, 0.8); border: 2px solid #555; padding: 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; position: relative; }
     .perk-item.locked { opacity: 0.5; filter: grayscale(100%); cursor: not-allowed; }
     .perk-item.selected { border-color: #4ade80; background: rgba(26, 51, 32, 0.9); }
@@ -86,7 +86,8 @@
     #hud { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; background: rgba(0, 0, 0, 0.8); padding: 10px 20px; border-radius: 12px; border: 1px solid #444; font-size: 14px; font-weight: bold; }
     #hud span { color: #ff4444; }
     #hud-item { color: #60a5fa !important; }
-    #ability-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; font-size: 18px; font-weight: bold; color: #e1bee7; text-shadow: 1px 1px 2px #000; display: none; }
+    
+    #ability-hint { position: absolute; bottom: 30px; left: 30px; text-align: left; font-size: 18px; font-weight: bold; color: #e1bee7; text-shadow: 1px 1px 2px #000; display: none; }
     
     #status-effects { position: absolute; right: 20px; top: 70px; display: flex; flex-direction: column; gap: 8px; z-index: 150; }
     .effect-badge { background: rgba(20, 20, 20, 0.85); border-left: 4px solid #fff; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.5); text-transform: uppercase; }
@@ -96,8 +97,12 @@
     #joystick-stick { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255, 255, 255, 0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: 0.05s ease-out; }
     .mob-action-btn { position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; background: rgba(255, 68, 68, 0.4); border: 2px solid #ff4444; border-radius: 50%; pointer-events: auto; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
     .mob-action-btn:active { background: rgba(255, 68, 68, 0.8); }
+    
     #mob-ability-btn { bottom: 130px; right: 30px; background: rgba(139, 92, 246, 0.4); border-color: #8b5cf6; width: 60px; height: 60px; font-size: 12px; display: none; }
     #mob-ability-btn:active { background: rgba(139, 92, 246, 0.8); }
+
+    #mob-item-btn { bottom: 210px; right: 30px; background: rgba(59, 130, 246, 0.4); border-color: #3b82f6; width: 60px; height: 60px; font-size: 12px; display: none; }
+    #mob-item-btn:active { background: rgba(59, 130, 246, 0.8); }
 
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: rgba(0,0,0,0.5); border-radius: 4px; }
@@ -152,7 +157,18 @@
     <div id="perk-menu" class="screen">
       <h2 id="perk-menu-title">ВЫБЕРИТЕ ПЕРКИ (0/4)</h2>
       <div id="perk-list"></div>
-      <div style="display:flex; gap:15px; margin-top:10px;">
+      
+      <div style="margin-top: 10px; text-align: left; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 6px;">
+          <label style="color:#fff; font-size:14px; font-weight:bold;">Размер лобби (Матчмейкинг):</label><br>
+          <select id="lobby-size-select" style="margin-top: 5px; background:#222; color:#fff; border:1px solid #555; padding:5px; border-radius:4px; width: 100%;">
+              <option value="2">1 на 1 (2 игрока)</option>
+              <option value="3">1 на 2 (3 игрока)</option>
+              <option value="4">1 на 3 (4 игрока)</option>
+              <option value="5" selected>1 на 4 (5 игроков)</option>
+          </select>
+      </div>
+
+      <div style="display:flex; gap:15px; margin-top:15px;">
           <button class="ui-btn" onclick="document.getElementById('perk-menu').style.display='none'; document.getElementById('char-menu').style.display='flex';">НАЗАД</button>
           <button id="ready-btn" class="ui-btn" style="background:#22c55e; color:#000;" onclick="joinQueue()">ПОИСК ИГРЫ (ИЛИ СОЛО)</button>
       </div>
@@ -172,14 +188,16 @@
       </div>
       <div id="status-effects"></div>
       <div id="ability-hint">
-        <span id="hint-e-text">[E] / НАВЫК</span><br>
-        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть системный курсор мыши</span>
+        <span id="hint-e-text">[E] / Навык</span><br>
+        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть системный курсор мыши</span><br>
+        <span id="hint-item-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[ПКМ] Использовать предмет</span>
       </div>
       
       <div id="mobile-controls">
         <div id="joystick-zone"><div id="joystick-stick"></div></div>
         <div id="mob-action-btn" class="mob-action-btn">Действие</div>
         <div id="mob-ability-btn" class="mob-action-btn">Навык</div>
+        <div id="mob-item-btn" class="mob-action-btn">Предмет</div>
       </div>
     </div>
   </div>
@@ -286,14 +304,14 @@
                     if (s.id !== socket.id) {
                         let img = null;
                         if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
-                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, blindTimer: 0 };
+                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, flash: false, flashAng: 0 };
                     }
                 });
             } else {
                 data.survivors.forEach(s => {
                     let img = null;
                     if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
-                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, blindTimer: 0 };
+                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, flash: false, flashAng: 0 };
                 });
             }
             startMatch();
@@ -307,6 +325,10 @@
             } else if (otherSurvivors[data.id]) { 
                 otherSurvivors[data.id].x = data.x; otherSurvivors[data.id].y = data.y; 
                 if (data.hp !== undefined) otherSurvivors[data.id].hp = data.hp; 
+                if (data.flash !== undefined) {
+                    otherSurvivors[data.id].flash = data.flash;
+                    otherSurvivors[data.id].flashAng = data.flashAng;
+                }
             }
 
             if (data.events && data.events.length > 0) {
@@ -321,14 +343,12 @@
                     
                     if (e.type === 'ability_decoy') { decoys.push({ x: e.x, y: e.y, timer: 600 }); playTone(400, 0.3, 'sine'); }
                     if (e.type === 'ability_slow' && myRole === 'SURVIVOR') {
-                        if (Math.hypot(player.x - e.x, player.y - e.y) < 350) pState.slowTimer = 180;
-                        playTone(800, 0.6, 'square');
+                        if (Math.hypot(player.x - e.x, player.y - e.y) < 350) pState.slowTimer = 180; playTone(800, 0.6, 'square');
                     }
                     if (e.type === 'ability_pull' && myRole === 'SURVIVOR') {
                         if (Math.hypot(player.x - e.x, player.y - e.y) < 400 && checkLOS(player.x, player.y, e.x, e.y)) {
                             let ang = Math.atan2(e.y - player.y, e.x - player.x);
-                            player.x += Math.cos(ang) * 100; player.y += Math.sin(ang) * 100;
-                            playTone(200, 0.4, 'triangle');
+                            player.x += Math.cos(ang) * 100; player.y += Math.sin(ang) * 100; playTone(200, 0.4, 'triangle');
                         }
                     }
                     if (e.type === 'perk_resin') { resinZones.push({ x: e.x, y: e.y, timer: 1200 }); }
@@ -336,6 +356,18 @@
                     if (e.type === 'perk_ruin' && myRole === 'SURVIVOR') {
                         let bestGen = generators.filter(g => !g.done).sort((a,b) => b.progress - a.progress)[0];
                         if (bestGen) { bestGen.progress = Math.max(0, bestGen.progress - 15); fakeExplosions.push({x: bestGen.x, y: bestGen.y, timer: 180}); }
+                    }
+
+                    if (e.type === 'flashlight_hit' && myRole === 'KILLER') {
+                        let s = otherSurvivors[data.id];
+                        if (s) {
+                            let kLookDiff = Math.abs(killer.faceAngle - Math.atan2(s.y - killer.y, s.x - killer.x));
+                            if (kLookDiff > Math.PI) kLookDiff = 2*Math.PI - kLookDiff;
+                            if (kLookDiff < Math.PI/2) {
+                                killer.blindProgress = (killer.blindProgress || 0) + 2.5;
+                                if (killer.blindProgress > 100) { killer.state = 'STUNNED'; killer.timer = 180; pState.blindTimer = 180; killer.blindProgress = 0; playTone(300, 0.4, 'sawtooth'); }
+                            }
+                        }
                     }
 
                     if (myRole === 'SURVIVOR' && e.type === 'hit') {
@@ -347,12 +379,15 @@
                             }
                         }
                     }
+                    
                     if (myRole === 'KILLER' && e.type === 'dead') {
-                        let reward = unlockRandomReward('KILLER');
-                        returnToLobby(`ЖЕРТВА ПРИНЕСЕНА\n\n${reward}`, '#4ade80');
+                        if (otherSurvivors[data.id]) otherSurvivors[data.id].hp = 0;
+                        checkKillerWin();
                     }
                     if (myRole === 'KILLER' && e.type === 'escaped') {
-                        returnToLobby('ВЫЖИВШИЙ СБЕЖАЛ', '#ff4444');
+                        if (otherSurvivors[data.id]) otherSurvivors[data.id].hp = 0;
+                        let alive = 0; for (let sid in otherSurvivors) { if (otherSurvivors[sid].hp > 0) alive++; }
+                        if (alive === 0) returnToLobby('ВЫЖИВШИЕ СБЕЖАЛИ', '#ffaa00');
                     }
                 }
             }
@@ -372,19 +407,31 @@
 
         socket.on('playerDisconnected', (id) => {
             if (gameState === 'PLAYING') {
-                if (id === kId) { returnToLobby('МАНЬЯК СБЕЖАЛ. ВЫ ПОБЕДИЛИ!', '#4ade80'); }
-                else if (otherSurvivors[id]) { delete otherSurvivors[id]; }
+                if (myRole === 'SURVIVOR' && id === kId) { 
+                    returnToLobby('МАНЬЯК СБЕЖАЛ. ВЫ ПОБЕДИЛИ!', '#4ade80'); 
+                }
+                else if (myRole === 'KILLER' && otherSurvivors[id]) { 
+                    delete otherSurvivors[id]; 
+                    checkKillerWin();
+                }
             }
         });
+    }
+
+    function checkKillerWin() {
+        let alive = 0;
+        for (let sid in otherSurvivors) { if (otherSurvivors[sid].hp > 0) alive++; }
+        if (alive === 0) {
+            let reward = unlockRandomReward('KILLER');
+            returnToLobby(`ВСЕ ЖЕРТВЫ ПРИНЕСЕНЫ / ОТКЛЮЧИЛИСЬ\n\n${reward}`, '#4ade80');
+        }
     }
 
     function joinQueue() {
         document.getElementById('perk-menu').style.display = 'none';
         document.getElementById('matchmaking-screen').style.display = 'flex';
-        let readyBtn = document.getElementById('ready-btn');
-        readyBtn.disabled = true; readyBtn.innerText = 'ОЖИДАНИЕ...';
-        
-        if (socket) { socket.emit('setUserData', currentUser); socket.emit('findMatch', myRole); } 
+        let size = parseInt(document.getElementById('lobby-size-select').value) || 5;
+        if (socket) { socket.emit('setUserData', currentUser); socket.emit('findMatch', { role: myRole, size: size }); } 
         else { console.warn("Socket.io недоступен, запустите локальный тест."); }
     }
 
@@ -456,9 +503,6 @@
     function openPerks() {
         document.getElementById('char-menu').style.display = 'none';
         document.getElementById('perk-menu').style.display = 'flex';
-        let readyBtn = document.getElementById('ready-btn');
-        readyBtn.disabled = false; readyBtn.innerText = 'ПОИСК ИГРЫ (ИЛИ СОЛО)';
-        
         document.getElementById('perk-menu-title').innerText = `ВЫБЕРИТЕ ПЕРКИ (0/4)`;
         const listDiv = document.getElementById('perk-list');
         listDiv.innerHTML = '';
@@ -480,27 +524,22 @@
     }
 
     const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
-    const player = { x: 0, y: 0, radius: 18, speed: 4.0, hp: 2, isRepairing: false, repairTarget: null, invTimer: 0, angle: Math.PI/2, item: null, charge: 0, vaulting: false, vaultProgress: 0, vaultStartX: 0, vaultStartY: 0, vaultEndX: 0, vaultEndY: 0, moving: false };
-    const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI, dashTimer: 0 };
+    const player = { x: 0, y: 0, radius: 18, speed: 4.0, hp: 2, isRepairing: false, repairTarget: null, invTimer: 0, angle: Math.PI/2, item: null, charge: 0, healProgress: 0, flashlightActive: false, flashlightAngle: 0, vaulting: false, vaultProgress: 0, vaultStartX: 0, vaultStartY: 0, vaultEndX: 0, vaultEndY: 0, moving: false };
+    const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI, dashTimer: 0, blindProgress: 0 };
     const obstacles = [{ x: 400, y: 300, w: 120, h: 80 }, { x: 400, y: 460, w: 120, h: 60 }, { x: 800, y: 200, w: 250, h: 100 }, { x: 1200, y: 450, w: 100, h: 120 }, { x: 1200, y: 650, w: 100, h: 100 }, { x: 300, y: 800, w: 300, h: 90 }, { x: 850, y: 750, w: 180, h: 180 }, { x: 600, y: 1100, w: 100, h: 80 }, { x: 780, y: 1100, w: 170, h: 80 }];
     const windows = [ { x: 400, y: 380, w: 120, h: 80, vaultDir: 'LR' }, { x: 1200, y: 570, w: 100, h: 80, vaultDir: 'LR' }, { x: 700, y: 1100, w: 80, h: 80, vaultDir: 'UD' } ];
     
-    // Пул безопасных досок (не застрянешь)
+    // Пул безопасных досок
     const safePalletSpawns = [
-      { x: 200, y: 350, w: 20, h: 120, cx: 210, cy: 410 },
-      { x: 700, y: 150, w: 100, h: 20, cx: 750, cy: 160 },
-      { x: 1050, y: 750, w: 20, h: 150, cx: 1060, cy: 825 },
-      { x: 600, y: 750, w: 150, h: 20, cx: 675, cy: 760 },
-      { x: 200, y: 800, w: 20, h: 100, cx: 210, cy: 850 },
-      { x: 900, y: 400, w: 100, h: 20, cx: 950, cy: 410 },
-      { x: 1400, y: 300, w: 20, h: 100, cx: 1410, cy: 350 },
-      { x: 1500, y: 900, w: 100, h: 20, cx: 1550, cy: 910 },
-      { x: 400, y: 150, w: 20, h: 100, cx: 410, cy: 200 },
-      { x: 800, y: 1000, w: 120, h: 20, cx: 860, cy: 1010 },
+      { x: 200, y: 350, w: 20, h: 120, cx: 210, cy: 410 }, { x: 700, y: 150, w: 100, h: 20, cx: 750, cy: 160 },
+      { x: 1050, y: 750, w: 20, h: 150, cx: 1060, cy: 825 }, { x: 600, y: 750, w: 150, h: 20, cx: 675, cy: 760 },
+      { x: 200, y: 800, w: 20, h: 100, cx: 210, cy: 850 }, { x: 900, y: 400, w: 100, h: 20, cx: 950, cy: 410 },
+      { x: 1400, y: 300, w: 20, h: 100, cx: 1410, cy: 350 }, { x: 1500, y: 900, w: 100, h: 20, cx: 1550, cy: 910 },
+      { x: 400, y: 150, w: 20, h: 100, cx: 410, cy: 200 }, { x: 800, y: 1000, w: 120, h: 20, cx: 860, cy: 1010 },
       { x: 1100, y: 150, w: 20, h: 120, cx: 1110, cy: 210 }
     ];
 
-    let generators = [], exitGate = {}, pallets = [], chests = [], fakeExplosions = [];
+    let generators = [], exitGate = {}, pallets = [], chests = [], fakeExplosions = [], decoys = [], resinZones = [];
     const skillCheck = { active: false, angle: 0, speed: 0.05, sStart: 0, sEnd: 0, gStart: 0, gEnd: 0 };
     
     let gameState = 'LOBBY';
@@ -584,14 +623,23 @@
       let hasAbility = myRole === 'KILLER' || myPerks.includes('s6');
       document.getElementById('ability-hint').style.display = 'block';
       document.getElementById('hint-e-text').style.display = hasAbility ? 'inline' : 'none';
-      document.getElementById('hint-f-text').style.display = isTouchDevice ? 'none' : 'inline';
-      if (isTouchDevice) document.getElementById('mob-ability-btn').style.display = hasAbility ? 'flex' : 'none';
+      
+      if (!isTouchDevice) {
+          let hintBox = document.getElementById('ability-hint');
+          hintBox.style.left = '30px'; hintBox.style.bottom = '30px'; hintBox.style.transform = 'none'; hintBox.style.textAlign = 'left';
+          document.getElementById('hint-f-text').style.display = 'inline';
+          document.getElementById('hint-item-text').style.display = myRole === 'SURVIVOR' ? 'inline' : 'none';
+      } else {
+          document.getElementById('mob-ability-btn').style.display = hasAbility ? 'flex' : 'none';
+          document.getElementById('hint-f-text').style.display = 'none';
+          document.getElementById('hint-item-text').style.display = 'none';
+      }
 
-      fakeExplosions = []; networkEvents = []; decoys = []; resinZones = []; scratchMarks = []; abilityCd = 0;
+      fakeExplosions = []; networkEvents = []; decoys = []; resinZones = []; abilityCd = 0;
       pState = { hitSprintTimer: 0, slowTimer: 0, blindTimer: 0, s3_stillTime: 0, s3_hidden: 0, s2_repairTime: 0, s2_buff: false, k4_trTimer: 0, k5_chaseTime: 0, stash: null };
       
-      player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0;
-      killer.x = 1400; killer.y = 1000; killer.state = 'SEARCH'; killer.faceAngle = Math.PI; killer.dashTimer = 0;
+      player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0; player.healProgress = 0; player.flashlightActive = false;
+      killer.x = 1400; killer.y = 1000; killer.state = 'SEARCH'; killer.faceAngle = Math.PI; killer.dashTimer = 0; killer.blindProgress = 0;
       
       if (myRole === 'SURVIVOR' && myCharData && myCharData.id === 's_vet') { player.item = 'toolbox'; player.charge = 100; }
 
@@ -677,7 +725,7 @@
             }
         } else if (myRole === 'SURVIVOR' && myPerks.includes('s6')) {
             if (player.item && !pState.stash) {
-                pState.stash = {x: player.x, y: player.y, item: player.item, charge: player.charge}; player.item = null; player.charge = 0;
+                pState.stash = {x: player.x, y: player.y, item: player.item, charge: player.charge}; player.item = null; player.charge = 0; rightClickDown = false;
             } else if (!player.item && pState.stash && Math.hypot(player.x - pState.stash.x, player.y - pState.stash.y) < 50) {
                 player.item = pState.stash.item; player.charge = Math.min(100, pState.stash.charge + 30); pState.stash = null;
             }
@@ -685,7 +733,6 @@
     }
 
     let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2, rightClickDown = false, keys = {};
-    let lastInputWasTouch = false;
     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     
     if (isTouchDevice) {
@@ -697,6 +744,8 @@
         jz.addEventListener('touchend', (e) => { e.preventDefault(); joyActive = false; window.joyDelta = {x:0, y:0}; js.style.transform = `translate(-50%, -50%)`; });
         document.getElementById('mob-action-btn').addEventListener('touchstart', (e) => { e.preventDefault(); doAction(); });
         document.getElementById('mob-ability-btn').addEventListener('touchstart', (e) => { e.preventDefault(); useAbility(); });
+        document.getElementById('mob-item-btn').addEventListener('touchstart', (e) => { e.preventDefault(); rightClickDown = true; });
+        document.getElementById('mob-item-btn').addEventListener('touchend', (e) => { e.preventDefault(); rightClickDown = false; });
         
         function updJoy(tx, ty) {
             let dx = tx - joyOrigin.x, dy = ty - joyOrigin.y, dist = Math.hypot(dx, dy);
@@ -705,25 +754,21 @@
         }
     }
 
-    window.addEventListener('touchstart', () => { lastInputWasTouch = true; });
-    
     document.addEventListener('mousemove', (e) => { 
-        lastInputWasTouch = false;
-        if (document.pointerLockElement === canvas) { 
+        if (!isTouchDevice && document.pointerLockElement === canvas) { 
             mouseX += e.movementX; mouseY += e.movementY; 
             mouseX = Math.max(0, Math.min(canvas.width, mouseX)); mouseY = Math.max(0, Math.min(canvas.height, mouseY)); 
-        } else { 
+        } else if (!isTouchDevice) { 
             mouseX = e.clientX; mouseY = e.clientY; 
         } 
     });
-    
-    canvas.addEventListener('mousedown', (e) => { if (gameState !== 'PLAYING' || lastInputWasTouch) return; if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true; });
+    canvas.addEventListener('mousedown', (e) => { if (gameState !== 'PLAYING' || isTouchDevice) return; if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true; });
     window.addEventListener('mouseup', (e) => { if (e.button === 2) rightClickDown = false; });
     window.addEventListener('keydown', e => { 
         keys[e.code] = true; 
         if (e.code === 'Space') doAction(); 
         if (e.code === 'KeyE') useAbility(); 
-        if (e.code === 'KeyF' && gameState === 'PLAYING') {
+        if (e.code === 'KeyF' && gameState === 'PLAYING' && !isTouchDevice) {
             if (document.pointerLockElement === canvas) document.exitPointerLock(); 
             else canvas.requestPointerLock();
         }
@@ -758,9 +803,14 @@
       camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
       
       let aimAngle;
-      if (lastInputWasTouch && myRole === 'KILLER') { if (window.joyDelta && Math.hypot(window.joyDelta.x, window.joyDelta.y) > 0.1) aimAngle = Math.atan2(window.joyDelta.y, window.joyDelta.x); else aimAngle = killer.faceAngle; } 
+      if (isTouchDevice && myRole === 'KILLER') { if (window.joyDelta && Math.hypot(window.joyDelta.x, window.joyDelta.y) > 0.1) aimAngle = Math.atan2(window.joyDelta.y, window.joyDelta.x); else aimAngle = killer.faceAngle; } 
       else { let screenTargetX = targetCamera.x - camera.x, screenTargetY = targetCamera.y - camera.y; aimAngle = Math.atan2(mouseY - screenTargetY, mouseX - screenTargetX); }
 
+      if (isTouchDevice && myRole === 'SURVIVOR') {
+          document.getElementById('mob-item-btn').style.display = player.item ? 'flex' : 'none';
+      }
+
+      // Таймеры перков и эффектов
       if(pState.hitSprintTimer > 0) pState.hitSprintTimer--;
       if(pState.slowTimer > 0) pState.slowTimer--;
       if(pState.blindTimer > 0) pState.blindTimer--;
@@ -771,6 +821,8 @@
       for (let i = fakeExplosions.length - 1; i >= 0; i--) { fakeExplosions[i].timer--; if (fakeExplosions[i].timer <= 0) fakeExplosions.splice(i, 1); }
       for (let i = decoys.length - 1; i >= 0; i--) { decoys[i].timer--; if (decoys[i].timer <= 0) decoys.splice(i, 1); }
       for (let i = resinZones.length - 1; i >= 0; i--) { resinZones[i].timer--; if (resinZones[i].timer <= 0) resinZones.splice(i, 1); }
+
+      if (player.item && player.charge <= 0) { player.item = null; player.charge = 0; rightClickDown = false; player.flashlightActive = false; }
 
       let sfx = [];
       if (myRole === 'SURVIVOR') {
@@ -783,10 +835,11 @@
       } else {
           if (pState.k5_chaseTime > 1500 || killer.dashTimer > 0) sfx.push({n: 'Жажда крови', c: '#ef4444'});
           if (pState.k4_trTimer > 0) sfx.push({n: 'Незаметность', c: '#8b5cf6'});
-          if (abilityCd <= 0) document.getElementById('hint-e-text').style.color = '#4ade80'; else document.getElementById('hint-e-text').style.color = '#aaa';
+          if (abilityCd <= 0 && document.getElementById('hint-e-text')) document.getElementById('hint-e-text').style.color = '#4ade80'; else if (document.getElementById('hint-e-text')) document.getElementById('hint-e-text').style.color = '#aaa';
       }
       document.getElementById('status-effects').innerHTML = sfx.map(e => `<div class="effect-badge" style="border-left-color: ${e.c}">${e.n}</div>`).join('');
 
+      // --- ЛОГИКА ВЫЖИВШЕГО ---
       if (myRole === 'SURVIVOR') {
           if (player.vaulting) {
               player.moving = true; let vStep = 0.04;
@@ -805,7 +858,7 @@
               if (pState.slowTimer > 0) currentSpeed *= 0.6;
               
               let mx = 0, my = 0;
-              if (lastInputWasTouch && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
+              if (isTouchDevice && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
               else { if (keys['KeyW'] || keys['ArrowUp']) my -= 1; if (keys['KeyS'] || keys['ArrowDown']) my += 1; if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1; if (keys['KeyD'] || keys['ArrowRight']) mx += 1; }
               const len = Math.hypot(mx, my);
               if (len > 0.05) {
@@ -820,6 +873,27 @@
               }
               if (pState.s3_hidden > 0) pState.s3_hidden--;
               if (player.invTimer > 0) player.invTimer--;
+
+              // Логика предметов (Аптечка / Фонарик)
+              let medkitActive = rightClickDown && player.item === 'medkit' && player.hp === 1;
+              if (medkitActive && player.charge > 0 && !player.vaulting && !player.moving) {
+                  player.charge -= 0.3; player.healProgress += 0.4; player.isRepairing = false;
+                  if (player.healProgress >= 100) { player.hp = 2; player.healProgress = 0; playTone(600, 0.3, 'sine'); }
+              } else { player.healProgress = 0; }
+
+              let flashlightActive = rightClickDown && player.item === 'flashlight';
+              player.flashlightActive = false;
+              if (flashlightActive && player.charge > 0 && !player.vaulting) {
+                  player.charge -= 0.15; player.flashlightActive = true; player.flashlightAngle = aimAngle;
+                  let kToP = Math.atan2(player.y - killer.y, player.x - killer.x);
+                  let kAngle = Math.atan2(killer.y - player.y, killer.x - player.x);
+                  let angleDiff = Math.abs(kAngle - player.flashlightAngle);
+                  if (angleDiff > Math.PI) angleDiff = 2*Math.PI - angleDiff;
+                  
+                  if (angleDiff < 0.35 && Math.hypot(killer.x - player.x, killer.y - player.y) < 350 && checkLOS(player.x, player.y, killer.x, killer.y)) {
+                      networkEvents.push({ type: 'flashlight_hit' });
+                  }
+              }
 
               if (player.isRepairing && player.repairTarget) {
                   if (myPerks.includes('s2')) { pState.s2_repairTime++; if (pState.s2_repairTime > 1800) { pState.s2_buff = true; pState.s2_repairTime = 0; } }
@@ -837,6 +911,7 @@
                       }
                   } else {
                       let repSpd = (myCharData && myCharData.id === 's_hack') ? 0.18 : 0.16;
+                      if (player.item === 'toolbox' && player.charge > 0) { player.charge -= 0.1; repSpd += 0.2; }
                       player.repairTarget.progress += repSpd; networkEvents.push({ type: 'genUpdate', id: generators.indexOf(player.repairTarget), progress: player.repairTarget.progress });
                       if (player.repairTarget.progress >= 100) { player.repairTarget.done = true; player.isRepairing = false; playTone(880, 0.3, 'sine'); player.repairTarget = null; } 
                       else if (!skillCheck.active && Math.random() < 0.009) triggerSkillCheck();
@@ -850,14 +925,17 @@
               }
           }
           if (socket && isMultiplayer) { 
-              if (pState.s3_hidden <= 0) { socket.emit('updatePosition', { x: player.x, y: player.y, hp: player.hp, state: 'run', events: networkEvents }); } 
-              else { socket.emit('updatePosition', { x: -1000, y: -1000, hp: player.hp, state: 'run', events: networkEvents }); }
+              let dt = { hp: player.hp, state: 'run', flash: player.flashlightActive, flashAng: player.flashlightAngle, events: networkEvents };
+              if (pState.s3_hidden <= 0) { dt.x = player.x; dt.y = player.y; socket.emit('updatePosition', dt); } 
+              else { dt.x = -1000; dt.y = -1000; socket.emit('updatePosition', dt); }
               networkEvents = []; 
           }
       } 
+      // --- ЛОГИКА МАНЬЯКА ---
       else if (myRole === 'KILLER') {
-          let wasChasing = false;
+          if (killer.blindProgress > 0) killer.blindProgress = Math.max(0, killer.blindProgress - 1);
           
+          let wasChasing = false;
           if (killer.state === 'STUNNED') { killer.timer--; if (killer.timer <= 0) killer.state = 'SEARCH'; } 
           else if (killer.state === 'BREAKING') {
               killer.timer--; if (killer.timer <= 0) { 
@@ -905,7 +983,7 @@
           else if (killer.state === 'ATTACK_CD') { killer.timer--; if (killer.timer <= 0) killer.state = 'SEARCH'; }
           else {
               let mx = 0, my = 0;
-              if (lastInputWasTouch && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
+              if (isTouchDevice && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
               else { if (keys['KeyW'] || keys['ArrowUp']) my -= 1; if (keys['KeyS'] || keys['ArrowDown']) my += 1; if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1; if (keys['KeyD'] || keys['ArrowRight']) mx += 1; }
               const len = Math.hypot(mx, my);
               let currentSpeed = killer.speed;
@@ -1016,8 +1094,24 @@
           }
       }
 
+      if (player.healProgress > 0) {
+          ctx.fillStyle = "#fff"; ctx.fillRect(player.x - 20, player.y - 30, 40, 6);
+          ctx.fillStyle = "#10b981"; ctx.fillRect(player.x - 20, player.y - 30, (player.healProgress/100)*40, 6);
+      }
+
+      if (player.flashlightActive && player.charge > 0) {
+          ctx.save(); ctx.beginPath(); ctx.moveTo(player.x, player.y); 
+          ctx.arc(player.x, player.y, 350, player.flashlightAngle - 0.35, player.flashlightAngle + 0.35); 
+          ctx.fillStyle = "rgba(255, 255, 180, 0.4)"; ctx.fill(); ctx.restore();
+      }
+
       for (let sId in otherSurvivors) {
           let s = otherSurvivors[sId];
+          if (s.flash) {
+              ctx.save(); ctx.beginPath(); ctx.moveTo(s.x, s.y); 
+              ctx.arc(s.x, s.y, 350, s.flashAng - 0.35, s.flashAng + 0.35); 
+              ctx.fillStyle = "rgba(255, 255, 180, 0.4)"; ctx.fill(); ctx.restore();
+          }
           if (s.hp > 0 && s.x > 0) { 
               let sColor = s.hp === 1 ? "#ef4444" : "#3b82f6";
               renderAvatar({x: s.x, y: s.y, radius: 18}, sColor, s.avatarImg, s.user ? s.user.name : "Выживший"); 
@@ -1047,7 +1141,7 @@
 
       if (myRole === 'SURVIVOR' && pState.blindTimer > 0) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 
-      if (!lastInputWasTouch) { 
+      if (!isTouchDevice && document.pointerLockElement !== canvas) { 
           ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; 
           ctx.beginPath(); 
           ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); 
