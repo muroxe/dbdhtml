@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Dead by Daylight HTML5 - Ultimate 4v1</title>
+  <title>Dead by Daylight HTML </title>
   
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="/socket.io/socket.io.js"></script>
@@ -189,7 +189,7 @@
       <div id="status-effects"></div>
       <div id="ability-hint">
         <span id="hint-e-text">[E] / Навык</span><br>
-        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть системный курсор мыши</span><br>
+        <span id="hint-f-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[F] Скрыть системный курсор</span><br>
         <span id="hint-item-text" style="font-size: 14px; color: #aaa; text-shadow: none;">[ПКМ] Использовать предмет</span>
       </div>
       
@@ -276,6 +276,7 @@
     let otherSurvivors = {}; 
     let kId = null;
     let matchSeed = 12345;
+    let screenShake = 0; // Для тряски камеры маньяка
 
     function seededRandom() {
         matchSeed = (matchSeed * 9301 + 49297) % 233280;
@@ -358,6 +359,7 @@
                         if (bestGen) { bestGen.progress = Math.max(0, bestGen.progress - 15); fakeExplosions.push({x: bestGen.x, y: bestGen.y, timer: 180}); }
                     }
 
+                    // Обработка ослепления маньяка фонариком
                     if (e.type === 'flashlight_hit' && myRole === 'KILLER') {
                         let s = otherSurvivors[data.id];
                         if (s) {
@@ -365,9 +367,15 @@
                             if (kLookDiff > Math.PI) kLookDiff = 2*Math.PI - kLookDiff;
                             if (kLookDiff < Math.PI/2) {
                                 killer.blindProgress = (killer.blindProgress || 0) + 2.5;
-                                if (killer.blindProgress > 100) { killer.state = 'STUNNED'; killer.timer = 180; pState.blindTimer = 180; killer.blindProgress = 0; playTone(300, 0.4, 'sawtooth'); }
+                                if (killer.blindProgress > 100) { killer.state = 'STUNNED'; killer.timer = 180; killer.blindTimer = 180; killer.blindProgress = 0; playTone(300, 0.4, 'sawtooth'); }
                             }
                         }
+                    }
+
+                    // Стан маньяка доской
+                    if (e.type === 'killer_stunned' && myRole === 'KILLER') {
+                        killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth');
+                        if (e.reason === 'pallet') screenShake = 25;
                     }
 
                     if (myRole === 'SURVIVOR' && e.type === 'hit') {
@@ -386,8 +394,7 @@
                     }
                     if (myRole === 'KILLER' && e.type === 'escaped') {
                         if (otherSurvivors[data.id]) otherSurvivors[data.id].hp = 0;
-                        let alive = 0; for (let sid in otherSurvivors) { if (otherSurvivors[sid].hp > 0) alive++; }
-                        if (alive === 0) returnToLobby('ВЫЖИВШИЕ СБЕЖАЛИ', '#ffaa00');
+                        checkKillerWin();
                     }
                 }
             }
@@ -431,6 +438,9 @@
         document.getElementById('perk-menu').style.display = 'none';
         document.getElementById('matchmaking-screen').style.display = 'flex';
         let size = parseInt(document.getElementById('lobby-size-select').value) || 5;
+        let readyBtn = document.getElementById('ready-btn');
+        readyBtn.disabled = true; readyBtn.innerText = 'ОЖИДАНИЕ...';
+
         if (socket) { socket.emit('setUserData', currentUser); socket.emit('findMatch', { role: myRole, size: size }); } 
         else { console.warn("Socket.io недоступен, запустите локальный тест."); }
     }
@@ -503,6 +513,9 @@
     function openPerks() {
         document.getElementById('char-menu').style.display = 'none';
         document.getElementById('perk-menu').style.display = 'flex';
+        let readyBtn = document.getElementById('ready-btn');
+        readyBtn.disabled = false; readyBtn.innerText = 'ПОИСК ИГРЫ (ИЛИ СОЛО)';
+        
         document.getElementById('perk-menu-title').innerText = `ВЫБЕРИТЕ ПЕРКИ (0/4)`;
         const listDiv = document.getElementById('perk-list');
         listDiv.innerHTML = '';
@@ -525,7 +538,7 @@
 
     const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
     const player = { x: 0, y: 0, radius: 18, speed: 4.0, hp: 2, isRepairing: false, repairTarget: null, invTimer: 0, angle: Math.PI/2, item: null, charge: 0, healProgress: 0, flashlightActive: false, flashlightAngle: 0, vaulting: false, vaultProgress: 0, vaultStartX: 0, vaultStartY: 0, vaultEndX: 0, vaultEndY: 0, moving: false };
-    const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI, dashTimer: 0, blindProgress: 0 };
+    const killer = { x: 0, y: 0, radius: 22, speed: 4.6, state: 'SEARCH', timer: 0, vx: 0, vy: 0, faceAngle: Math.PI, dashTimer: 0, blindProgress: 0, blindTimer: 0 };
     const obstacles = [{ x: 400, y: 300, w: 120, h: 80 }, { x: 400, y: 460, w: 120, h: 60 }, { x: 800, y: 200, w: 250, h: 100 }, { x: 1200, y: 450, w: 100, h: 120 }, { x: 1200, y: 650, w: 100, h: 100 }, { x: 300, y: 800, w: 300, h: 90 }, { x: 850, y: 750, w: 180, h: 180 }, { x: 600, y: 1100, w: 100, h: 80 }, { x: 780, y: 1100, w: 170, h: 80 }];
     const windows = [ { x: 400, y: 380, w: 120, h: 80, vaultDir: 'LR' }, { x: 1200, y: 570, w: 100, h: 80, vaultDir: 'LR' }, { x: 700, y: 1100, w: 80, h: 80, vaultDir: 'UD' } ];
     
@@ -635,11 +648,11 @@
           document.getElementById('hint-item-text').style.display = 'none';
       }
 
-      fakeExplosions = []; networkEvents = []; decoys = []; resinZones = []; abilityCd = 0;
+      fakeExplosions = []; networkEvents = []; decoys = []; resinZones = []; scratchMarks = []; abilityCd = 0; screenShake = 0;
       pState = { hitSprintTimer: 0, slowTimer: 0, blindTimer: 0, s3_stillTime: 0, s3_hidden: 0, s2_repairTime: 0, s2_buff: false, k4_trTimer: 0, k5_chaseTime: 0, stash: null };
       
       player.x = 220; player.y = 220; player.hp = 2; player.isRepairing = false; player.repairTarget = null; player.vaulting = false; player.item = null; player.charge = 0; player.healProgress = 0; player.flashlightActive = false;
-      killer.x = 1400; killer.y = 1000; killer.state = 'SEARCH'; killer.faceAngle = Math.PI; killer.dashTimer = 0; killer.blindProgress = 0;
+      killer.x = 1400; killer.y = 1000; killer.state = 'SEARCH'; killer.faceAngle = Math.PI; killer.dashTimer = 0; killer.blindProgress = 0; killer.blindTimer = 0;
       
       if (myRole === 'SURVIVOR' && myCharData && myCharData.id === 's_vet') { player.item = 'toolbox'; player.charge = 100; }
 
@@ -688,6 +701,8 @@
                 p.state = 'dropped'; networkEvents.push({ type: 'palletDrop', id: pallets.indexOf(p) }); playTone(200, 0.2, 'square'); 
                 if (Math.hypot(killer.x - p.cx, killer.y - p.cy) < 95 && killer.state !== 'STUNNED') { 
                     killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth'); 
+                    networkEvents.push({ type: 'killer_stunned', reason: 'pallet' });
+                    if (!isMultiplayer && myRole === 'KILLER') screenShake = 25; // offline test
                     if (myPerks.includes('s7')) pState.hitSprintTimer = 120;
                     if (myPerks.includes('k7')) networkEvents.push({ type: 'perk_blind' });
                 } return; 
@@ -733,6 +748,7 @@
     }
 
     let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2, rightClickDown = false, keys = {};
+    let lastInputWasTouch = false;
     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     
     if (isTouchDevice) {
@@ -754,21 +770,25 @@
         }
     }
 
+    window.addEventListener('touchstart', () => { lastInputWasTouch = true; });
+    
     document.addEventListener('mousemove', (e) => { 
-        if (!isTouchDevice && document.pointerLockElement === canvas) { 
+        lastInputWasTouch = false;
+        if (document.pointerLockElement === canvas) { 
             mouseX += e.movementX; mouseY += e.movementY; 
             mouseX = Math.max(0, Math.min(canvas.width, mouseX)); mouseY = Math.max(0, Math.min(canvas.height, mouseY)); 
-        } else if (!isTouchDevice) { 
+        } else { 
             mouseX = e.clientX; mouseY = e.clientY; 
         } 
     });
-    canvas.addEventListener('mousedown', (e) => { if (gameState !== 'PLAYING' || isTouchDevice) return; if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true; });
+    
+    canvas.addEventListener('mousedown', (e) => { if (gameState !== 'PLAYING' || lastInputWasTouch) return; if (e.button === 0) doAction(); if (e.button === 2) rightClickDown = true; });
     window.addEventListener('mouseup', (e) => { if (e.button === 2) rightClickDown = false; });
     window.addEventListener('keydown', e => { 
         keys[e.code] = true; 
         if (e.code === 'Space') doAction(); 
         if (e.code === 'KeyE') useAbility(); 
-        if (e.code === 'KeyF' && gameState === 'PLAYING' && !isTouchDevice) {
+        if (e.code === 'KeyF' && gameState === 'PLAYING') {
             if (document.pointerLockElement === canvas) document.exitPointerLock(); 
             else canvas.requestPointerLock();
         }
@@ -803,7 +823,7 @@
       camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
       
       let aimAngle;
-      if (isTouchDevice && myRole === 'KILLER') { if (window.joyDelta && Math.hypot(window.joyDelta.x, window.joyDelta.y) > 0.1) aimAngle = Math.atan2(window.joyDelta.y, window.joyDelta.x); else aimAngle = killer.faceAngle; } 
+      if (lastInputWasTouch && myRole === 'KILLER') { if (window.joyDelta && Math.hypot(window.joyDelta.x, window.joyDelta.y) > 0.1) aimAngle = Math.atan2(window.joyDelta.y, window.joyDelta.x); else aimAngle = killer.faceAngle; } 
       else { let screenTargetX = targetCamera.x - camera.x, screenTargetY = targetCamera.y - camera.y; aimAngle = Math.atan2(mouseY - screenTargetY, mouseX - screenTargetX); }
 
       if (isTouchDevice && myRole === 'SURVIVOR') {
@@ -816,7 +836,13 @@
       if(pState.blindTimer > 0) pState.blindTimer--;
       if(pState.k4_trTimer > 0) pState.k4_trTimer--;
       if(abilityCd > 0) abilityCd--;
-      if(killer.dashTimer > 0) killer.dashTimer--;
+      
+      if(myRole === 'KILLER') {
+          if(killer.dashTimer > 0) killer.dashTimer--;
+          if(killer.blindTimer > 0) killer.blindTimer--;
+          if(killer.blindProgress > 0 && killer.state !== 'STUNNED') killer.blindProgress = Math.max(0, killer.blindProgress - 1);
+          if(screenShake > 0) { screenShake *= 0.9; if (screenShake < 0.5) screenShake = 0; }
+      }
       
       for (let i = fakeExplosions.length - 1; i >= 0; i--) { fakeExplosions[i].timer--; if (fakeExplosions[i].timer <= 0) fakeExplosions.splice(i, 1); }
       for (let i = decoys.length - 1; i >= 0; i--) { decoys[i].timer--; if (decoys[i].timer <= 0) decoys.splice(i, 1); }
@@ -858,7 +884,7 @@
               if (pState.slowTimer > 0) currentSpeed *= 0.6;
               
               let mx = 0, my = 0;
-              if (isTouchDevice && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
+              if (lastInputWasTouch && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
               else { if (keys['KeyW'] || keys['ArrowUp']) my -= 1; if (keys['KeyS'] || keys['ArrowDown']) my += 1; if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1; if (keys['KeyD'] || keys['ArrowRight']) mx += 1; }
               const len = Math.hypot(mx, my);
               if (len > 0.05) {
@@ -933,9 +959,8 @@
       } 
       // --- ЛОГИКА МАНЬЯКА ---
       else if (myRole === 'KILLER') {
-          if (killer.blindProgress > 0) killer.blindProgress = Math.max(0, killer.blindProgress - 1);
-          
           let wasChasing = false;
+          
           if (killer.state === 'STUNNED') { killer.timer--; if (killer.timer <= 0) killer.state = 'SEARCH'; } 
           else if (killer.state === 'BREAKING') {
               killer.timer--; if (killer.timer <= 0) { 
@@ -973,7 +998,7 @@
                           } 
                       } else { 
                           socket.emit('hitPlayer', s.id); 
-                          if (instaDown) socket.emit('hitPlayer', s.id); 
+                          if (instaDown) socket.emit('hitPlayer', s.id); // Double hit for insta-down
                       }
                       break; 
                   }
@@ -983,7 +1008,7 @@
           else if (killer.state === 'ATTACK_CD') { killer.timer--; if (killer.timer <= 0) killer.state = 'SEARCH'; }
           else {
               let mx = 0, my = 0;
-              if (isTouchDevice && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
+              if (lastInputWasTouch && window.joyDelta) { mx = window.joyDelta.x; my = window.joyDelta.y; } 
               else { if (keys['KeyW'] || keys['ArrowUp']) my -= 1; if (keys['KeyS'] || keys['ArrowDown']) my += 1; if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1; if (keys['KeyD'] || keys['ArrowRight']) mx += 1; }
               const len = Math.hypot(mx, my);
               let currentSpeed = killer.speed;
@@ -992,6 +1017,7 @@
               if (len > 0.05) { const nx = killer.x + (mx / (len>1?len:1)) * currentSpeed, ny = killer.y + (my / (len>1?len:1)) * currentSpeed; if (!checkWall(nx, killer.y, killer.radius, true, false)) killer.x = nx; if (!checkWall(killer.x, ny, killer.radius, true, false)) killer.y = ny; }
               killer.faceAngle = aimAngle;
 
+              // Chase checking logic
               let isChasing = false;
               let targets = isMultiplayer ? Object.values(otherSurvivors) : [player];
               for(let s of targets) { if(s.hp > 0 && Math.hypot(s.x - killer.x, s.y - killer.y) < 450 && checkLOS(killer.x, killer.y, s.x, s.y)) isChasing = true; }
@@ -1034,7 +1060,11 @@
       camera.x = Math.max(0, Math.min(targetCamera.x - cx, MAP_WIDTH - canvas.width)); 
       camera.y = Math.max(0, Math.min(targetCamera.y - cy, MAP_HEIGHT - canvas.height));
       
-      ctx.save(); ctx.translate(-camera.x, -camera.y);
+      ctx.save(); 
+      ctx.translate(-camera.x, -camera.y);
+      if (myRole === 'KILLER' && screenShake > 0) {
+          ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+      }
 
       ctx.fillStyle = "#141714"; ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT); ctx.strokeStyle = "#1f241f"; ctx.lineWidth = 2;
       for (let x = 0; x < MAP_WIDTH; x+=100) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,MAP_HEIGHT); ctx.stroke(); }
@@ -1139,9 +1169,20 @@
       }
       ctx.restore();
 
-      if (myRole === 'SURVIVOR' && pState.blindTimer > 0) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+      // Белый экран ослепления для Маньяка
+      if (myRole === 'KILLER') {
+          let blindAlpha = 0;
+          if (killer.blindTimer > 0) blindAlpha = 1;
+          else if (killer.blindProgress > 0) blindAlpha = killer.blindProgress / 100;
+          
+          if (blindAlpha > 0) {
+              ctx.fillStyle = `rgba(255, 255, 255, ${blindAlpha})`;
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+      }
 
-      if (!isTouchDevice && document.pointerLockElement !== canvas) { 
+      // Отрисовка белого кастомного курсора
+      if (!lastInputWasTouch) { 
           ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; 
           ctx.beginPath(); 
           ctx.arc(mouseX, mouseY, 4, 0, Math.PI * 2); 
