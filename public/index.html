@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Dead by Daylight HTML </title>
+  <title>Dead by Daylight HTML5 - Ultimate 4v1</title>
   
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="/socket.io/socket.io.js"></script>
@@ -203,7 +203,7 @@
   </div>
 
   <script>
-    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot"; // <-- ЗАМЕНИТЬ НА СВОЕГО БОТА
+    const TELEGRAM_BOT_USERNAME = "dbdhtmlbot";
 
     let currentUser = { id: null, name: "Гость", photo: null };
     let myAvatarImg = null;
@@ -276,7 +276,7 @@
     let otherSurvivors = {}; 
     let kId = null;
     let matchSeed = 12345;
-    let screenShake = 0; // Для тряски камеры маньяка
+    let screenShake = 0; 
 
     function seededRandom() {
         matchSeed = (matchSeed * 9301 + 49297) % 233280;
@@ -305,14 +305,14 @@
                     if (s.id !== socket.id) {
                         let img = null;
                         if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
-                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, flash: false, flashAng: 0 };
+                        otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, flash: false, flashAng: 0, escaped: false };
                     }
                 });
             } else {
                 data.survivors.forEach(s => {
                     let img = null;
                     if (s.user && s.user.photo) { img = new Image(); img.crossOrigin = "Anonymous"; img.src = s.user.photo; }
-                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, flash: false, flashAng: 0 };
+                    otherSurvivors[s.id] = { x: 220, y: 220, hp: 2, state: 'run', user: s.user, avatarImg: img, flash: false, flashAng: 0, escaped: false };
                 });
             }
             startMatch();
@@ -359,7 +359,6 @@
                         if (bestGen) { bestGen.progress = Math.max(0, bestGen.progress - 15); fakeExplosions.push({x: bestGen.x, y: bestGen.y, timer: 180}); }
                     }
 
-                    // Обработка ослепления маньяка фонариком
                     if (e.type === 'flashlight_hit' && myRole === 'KILLER') {
                         let s = otherSurvivors[data.id];
                         if (s) {
@@ -367,12 +366,11 @@
                             if (kLookDiff > Math.PI) kLookDiff = 2*Math.PI - kLookDiff;
                             if (kLookDiff < Math.PI/2) {
                                 killer.blindProgress = (killer.blindProgress || 0) + 2.5;
-                                if (killer.blindProgress > 100) { killer.state = 'STUNNED'; killer.timer = 180; killer.blindTimer = 180; killer.blindProgress = 0; playTone(300, 0.4, 'sawtooth'); }
+                                if (killer.blindProgress > 100) { killer.state = 'STUNNED'; killer.timer = 180; pState.blindTimer = 180; killer.blindProgress = 0; playTone(300, 0.4, 'sawtooth'); }
                             }
                         }
                     }
 
-                    // Стан маньяка доской
                     if (e.type === 'killer_stunned' && myRole === 'KILLER') {
                         killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth');
                         if (e.reason === 'pallet') screenShake = 25;
@@ -390,11 +388,14 @@
                     
                     if (myRole === 'KILLER' && e.type === 'dead') {
                         if (otherSurvivors[data.id]) otherSurvivors[data.id].hp = 0;
-                        checkKillerWin();
+                        checkKillerWin(false);
                     }
                     if (myRole === 'KILLER' && e.type === 'escaped') {
-                        if (otherSurvivors[data.id]) otherSurvivors[data.id].hp = 0;
-                        checkKillerWin();
+                        if (otherSurvivors[data.id]) {
+                            otherSurvivors[data.id].hp = 0;
+                            otherSurvivors[data.id].escaped = true;
+                        }
+                        checkKillerWin(false);
                     }
                 }
             }
@@ -415,22 +416,33 @@
         socket.on('playerDisconnected', (id) => {
             if (gameState === 'PLAYING') {
                 if (myRole === 'SURVIVOR' && id === kId) { 
-                    returnToLobby('МАНЬЯК СБЕЖАЛ. ВЫ ПОБЕДИЛИ!', '#4ade80'); 
+                    returnToLobby('МАНЬЯК ОТКЛЮЧИЛСЯ. МАТЧ ПРЕРВАН', '#ffaa00'); 
                 }
                 else if (myRole === 'KILLER' && otherSurvivors[id]) { 
                     delete otherSurvivors[id]; 
-                    checkKillerWin();
+                    checkKillerWin(true);
                 }
             }
         });
     }
 
-    function checkKillerWin() {
-        let alive = 0;
-        for (let sid in otherSurvivors) { if (otherSurvivors[sid].hp > 0) alive++; }
-        if (alive === 0) {
-            let reward = unlockRandomReward('KILLER');
-            returnToLobby(`ВСЕ ЖЕРТВЫ ПРИНЕСЕНЫ / ОТКЛЮЧИЛИСЬ\n\n${reward}`, '#4ade80');
+    function checkKillerWin(isDisconnect = false) {
+        let playing = 0;
+        let escapedCount = 0;
+        for (let sid in otherSurvivors) { 
+            if (otherSurvivors[sid].escaped) escapedCount++;
+            else if (otherSurvivors[sid].hp > 0) playing++; 
+        }
+        
+        if (playing === 0) {
+            if (isDisconnect) {
+                returnToLobby('МАТЧ ПРЕРВАН (ИГРОК ОТКЛЮЧИЛСЯ)', '#ffaa00');
+            } else if (escapedCount > 0) {
+                returnToLobby('МАТЧ ОКОНЧЕН (ЕСТЬ СБЕЖАВШИЕ)', '#ffaa00');
+            } else {
+                let reward = unlockRandomReward('KILLER');
+                returnToLobby(`ВСЕ ЖЕРТВЫ ПРИНЕСЕНЫ\n\n${reward}`, '#4ade80');
+            }
         }
     }
 
@@ -702,7 +714,7 @@
                 if (Math.hypot(killer.x - p.cx, killer.y - p.cy) < 95 && killer.state !== 'STUNNED') { 
                     killer.state = 'STUNNED'; killer.timer = 180; playTone(100, 0.5, 'sawtooth'); 
                     networkEvents.push({ type: 'killer_stunned', reason: 'pallet' });
-                    if (!isMultiplayer && myRole === 'KILLER') screenShake = 25; // offline test
+                    if (!isMultiplayer && myRole === 'KILLER') screenShake = 25; 
                     if (myPerks.includes('s7')) pState.hitSprintTimer = 120;
                     if (myPerks.includes('k7')) networkEvents.push({ type: 'perk_blind' });
                 } return; 
@@ -998,7 +1010,7 @@
                           } 
                       } else { 
                           socket.emit('hitPlayer', s.id); 
-                          if (instaDown) socket.emit('hitPlayer', s.id); // Double hit for insta-down
+                          if (instaDown) socket.emit('hitPlayer', s.id); 
                       }
                       break; 
                   }
@@ -1017,7 +1029,6 @@
               if (len > 0.05) { const nx = killer.x + (mx / (len>1?len:1)) * currentSpeed, ny = killer.y + (my / (len>1?len:1)) * currentSpeed; if (!checkWall(nx, killer.y, killer.radius, true, false)) killer.x = nx; if (!checkWall(killer.x, ny, killer.radius, true, false)) killer.y = ny; }
               killer.faceAngle = aimAngle;
 
-              // Chase checking logic
               let isChasing = false;
               let targets = isMultiplayer ? Object.values(otherSurvivors) : [player];
               for(let s of targets) { if(s.hp > 0 && Math.hypot(s.x - killer.x, s.y - killer.y) < 450 && checkLOS(killer.x, killer.y, s.x, s.y)) isChasing = true; }
@@ -1169,7 +1180,6 @@
       }
       ctx.restore();
 
-      // Белый экран ослепления для Маньяка
       if (myRole === 'KILLER') {
           let blindAlpha = 0;
           if (killer.blindTimer > 0) blindAlpha = 1;
@@ -1181,7 +1191,6 @@
           }
       }
 
-      // Отрисовка белого кастомного курсора
       if (!lastInputWasTouch) { 
           ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; 
           ctx.beginPath(); 
